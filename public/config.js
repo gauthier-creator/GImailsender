@@ -129,12 +129,18 @@ function escapeHtml(text) {
 const modal = document.getElementById('templateModal');
 const modalTitle = document.getElementById('modalTitle');
 
-document.getElementById('addTemplate').addEventListener('click', () => {
-  editingTemplateId = null;
-  modalTitle.textContent = 'Nouveau template';
+function clearModal() {
   document.getElementById('tplName').value = '';
   document.getElementById('tplSubject').value = '';
   document.getElementById('tplBody').value = '';
+  document.getElementById('tplAttachmentName').value = '';
+  document.getElementById('tplAttachmentUrl').value = '';
+}
+
+document.getElementById('addTemplate').addEventListener('click', () => {
+  editingTemplateId = null;
+  modalTitle.textContent = 'Nouveau template';
+  clearModal();
   modal.style.display = 'flex';
 });
 
@@ -161,6 +167,8 @@ window.editTemplate = async function(id) {
   document.getElementById('tplName').value = t.name;
   document.getElementById('tplSubject').value = t.subject;
   document.getElementById('tplBody').value = t.body;
+  document.getElementById('tplAttachmentName').value = t.attachment_name || '';
+  document.getElementById('tplAttachmentUrl').value = t.attachment_url || '';
   modal.style.display = 'flex';
 };
 
@@ -180,7 +188,9 @@ document.getElementById('saveTemplate').addEventListener('click', async () => {
     return;
   }
 
-  const payload = { name, subject, body };
+  const attachment_name = document.getElementById('tplAttachmentName').value.trim() || null;
+  const attachment_url = document.getElementById('tplAttachmentUrl').value.trim() || null;
+  const payload = { name, subject, body, attachment_name, attachment_url };
 
   if (editingTemplateId) {
     await fetch(`/api/templates/${editingTemplateId}`, {

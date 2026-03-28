@@ -14,30 +14,46 @@ async function getConfig() {
   return config;
 }
 
-async function saveConfig(config) {
-  const rows = Object.entries(config).map(([key, value]) => ({ key, value }));
-  for (const row of rows) {
-    await supabase.from('config').upsert(row, { onConflict: 'key' });
-  }
+async function setConfigKey(key, value) {
+  await supabase.from('config').upsert({ key, value }, { onConflict: 'key' });
+}
+
+async function deleteConfigKey(key) {
+  await supabase.from('config').delete().eq('key', key);
 }
 
 // --- Templates ---
 
+function formatTemplate(t) {
+  return {
+    id: t.id,
+    name: t.name,
+    subject: t.subject,
+    body: t.body,
+    attachment_url: t.attachment_url || null,
+    attachment_name: t.attachment_name || null
+  };
+}
+
 async function getTemplates() {
   const { data } = await supabase.from('templates').select('*').order('created_at');
-  return (data || []).map(t => ({ id: t.id, name: t.name, subject: t.subject, body: t.body }));
+  return (data || []).map(formatTemplate);
 }
 
-async function addTemplate({ name, subject, body }) {
-  const { data, error } = await supabase.from('templates').insert({ name, subject, body }).select().single();
+async function addTemplate({ name, subject, body, attachment_url, attachment_name }) {
+  const { data, error } = await supabase.from('templates')
+    .insert({ name, subject, body, attachment_url: attachment_url || null, attachment_name: attachment_name || null })
+    .select().single();
   if (error) throw error;
-  return { id: data.id, name: data.name, subject: data.subject, body: data.body };
+  return formatTemplate(data);
 }
 
-async function updateTemplate(id, { name, subject, body }) {
-  const { data, error } = await supabase.from('templates').update({ name, subject, body }).eq('id', id).select().single();
+async function updateTemplate(id, { name, subject, body, attachment_url, attachment_name }) {
+  const { data, error } = await supabase.from('templates')
+    .update({ name, subject, body, attachment_url: attachment_url || null, attachment_name: attachment_name || null })
+    .eq('id', id).select().single();
   if (error) throw error;
-  return { id: data.id, name: data.name, subject: data.subject, body: data.body };
+  return formatTemplate(data);
 }
 
 async function deleteTemplate(id) {
@@ -45,4 +61,4 @@ async function deleteTemplate(id) {
   if (error) throw error;
 }
 
-module.exports = { getConfig, saveConfig, getTemplates, addTemplate, updateTemplate, deleteTemplate };
+module.exports = { getConfig, setConfigKey, deleteConfigKey, getTemplates, addTemplate, updateTemplate, deleteTemplate };

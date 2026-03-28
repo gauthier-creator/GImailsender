@@ -111,6 +111,16 @@
             <label for="tplBody">Corps du mail <span class="hint">Utilise {{prenom}} pour le prénom. HTML supporté.</span></label>
             <textarea id="tplBody" rows="14" placeholder="Bonjour {{prenom}},&#10;&#10;Suite à notre échange..."></textarea>
           </div>
+          <div style="border-top:1px solid #2a2a2a;margin:20px 0;"></div>
+          <h3 style="margin-bottom:12px;">Pièce jointe par défaut <span class="hint" style="font-size:12px;">(optionnel)</span></h3>
+          <div class="field">
+            <label for="tplAttachmentName">Nom du fichier</label>
+            <input type="text" id="tplAttachmentName" placeholder="Brochure George V.pdf">
+          </div>
+          <div class="field">
+            <label for="tplAttachmentUrl">URL de téléchargement direct</label>
+            <input type="url" id="tplAttachmentUrl" placeholder="https://...">
+          </div>
           <div class="modal-actions">
             <button id="cancelTemplate" class="btn btn-ghost">Annuler</button>
             <button id="saveTemplate" class="btn">Sauvegarder</button>

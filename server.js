@@ -1,14 +1,11 @@
 require('dotenv').config();
 const express = require('express');
 const { google } = require('googleapis');
-const multer = require('multer');
-const { getConfig, saveConfig, getTemplates, addTemplate, updateTemplate, deleteTemplate } = require('./store');
+const { getConfig, setConfigKey, deleteConfigKey, getTemplates, addTemplate, updateTemplate, deleteTemplate } = require('./store');
 
 const app = express();
 app.use(express.json());
 app.use(express.static('public', { etag: false, maxAge: 0 }));
-
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 const PORT = process.env.PORT || 3000;
 
@@ -43,12 +40,12 @@ app.get('/api/templates', async (req, res) => {
 });
 
 app.post('/api/templates', async (req, res) => {
-  const { name, subject, body } = req.body;
+  const { name, subject, body, attachment_url, attachment_name } = req.body;
   if (!name || !subject || !body) {
     return res.status(400).json({ error: 'name, subject et body sont requis.' });
   }
   try {
-    const template = await addTemplate({ name, subject, body });
+    const template = await addTemplate({ name, subject, body, attachment_url, attachment_name });
     res.json({ success: true, template });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -56,9 +53,9 @@ app.post('/api/templates', async (req, res) => {
 });
 
 app.put('/api/templates/:id', async (req, res) => {
-  const { name, subject, body } = req.body;
+  const { name, subject, body, attachment_url, attachment_name } = req.body;
   try {
-    const template = await updateTemplate(req.params.id, { name, subject, body });
+    const template = await updateTemplate(req.params.id, { name, subject, body, attachment_url, attachment_name });
     res.json({ success: true, template });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -81,30 +78,22 @@ app.get('/api/config/signature', async (req, res) => {
   res.json({ signature: config.gmailSignature || '' });
 });
 
+app.post('/api/config/signature', async (req, res) => {
+  const { signature } = req.body;
+  await setConfigKey('gmailSignature', signature || '');
+  res.json({ success: true });
+});
+
 app.get('/api/config/signature/import', async (req, res) => {
   const gmail = await getGmailClient();
-  if (!gmail) {
-    return res.status(400).json({ error: 'Gmail non configuré.' });
-  }
+  if (!gmail) return res.status(400).json({ error: 'Gmail non configuré.' });
   const senderEmail = await getSenderEmail();
   try {
-    const response = await gmail.users.settings.sendAs.get({
-      userId: 'me',
-      sendAsEmail: senderEmail
-    });
-    const signature = response.data.signature || '';
-    res.json({ signature });
+    const response = await gmail.users.settings.sendAs.get({ userId: 'me', sendAsEmail: senderEmail });
+    res.json({ signature: response.data.signature || '' });
   } catch (err) {
     res.status(500).json({ error: `Impossible de récupérer la signature : ${err.message}` });
   }
-});
-
-app.post('/api/config/signature', async (req, res) => {
-  const { signature } = req.body;
-  const config = await getConfig();
-  config.gmailSignature = signature || '';
-  await saveConfig(config);
-  res.json({ success: true });
 });
 
 app.get('/api/config/status', async (req, res) => {
@@ -120,11 +109,9 @@ app.post('/api/config/credentials', async (req, res) => {
   if (!gmailClientId || !gmailClientSecret || !gmailUser) {
     return res.status(400).json({ error: 'Tous les champs sont requis.' });
   }
-  const config = await getConfig();
-  config.gmailClientId = gmailClientId;
-  config.gmailClientSecret = gmailClientSecret;
-  config.gmailUser = gmailUser;
-  await saveConfig(config);
+  await setConfigKey('gmailClientId', gmailClientId);
+  await setConfigKey('gmailClientSecret', gmailClientSecret);
+  await setConfigKey('gmailUser', gmailUser);
   res.json({ success: true });
 });
 
@@ -136,53 +123,51 @@ app.get('/api/config/oauth/start', async (req, res) => {
   if (!clientId || !clientSecret) {
     return res.status(400).json({ error: 'Configure d\'abord Client ID et Client Secret.' });
   }
-
   const redirectUri = `${getAppUrl(req)}/api/config/oauth/callback`;
   const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
-
   const authUrl = oauth2Client.generateAuthUrl({
     access_type: 'offline',
     scope: ['https://www.googleapis.com/auth/gmail.send', 'https://www.googleapis.com/auth/gmail.settings.basic'],
     prompt: 'consent'
   });
-
   res.json({ authUrl });
 });
 
 // OAuth callback
 app.get('/api/config/oauth/callback', async (req, res) => {
-  const { code } = req.query;
-  if (!code) return res.status(400).send('Code manquant.');
-
+  const { code, error } = req.query;
+  if (error || !code) {
+    console.error('OAuth error from Google:', error);
+    return res.redirect('/config.html?error=oauth_failed');
+  }
   const config = await getConfig();
   const clientId = config.gmailClientId || process.env.GMAIL_CLIENT_ID;
   const clientSecret = config.gmailClientSecret || process.env.GMAIL_CLIENT_SECRET;
   const redirectUri = `${getAppUrl(req)}/api/config/oauth/callback`;
-
   const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
-
   try {
     const { tokens } = await oauth2Client.getToken(code);
-    config.gmailRefreshToken = tokens.refresh_token;
-    await saveConfig(config);
+    if (!tokens.refresh_token) {
+      // Token already exists — just redirect as connected
+      return res.redirect('/config.html?connected=true');
+    }
+    await setConfigKey('gmailRefreshToken', tokens.refresh_token);
     res.redirect('/config.html?connected=true');
   } catch (err) {
-    console.error('OAuth error:', err.message);
-    res.redirect('/config.html?error=oauth_failed');
+    console.error('OAuth token exchange error:', err.message);
+    res.redirect(`/config.html?error=${encodeURIComponent(err.message)}`);
   }
 });
 
-// Disconnect Gmail
+// Disconnect Gmail — properly deletes the refresh token from Supabase
 app.post('/api/config/disconnect', async (req, res) => {
-  const config = await getConfig();
-  delete config.gmailRefreshToken;
-  await saveConfig(config);
+  await deleteConfigKey('gmailRefreshToken');
   res.json({ success: true });
 });
 
 // ============ SEND EMAIL ============
 
-app.post('/api/send', upload.single('attachment'), async (req, res) => {
+app.post('/api/send', express.json(), async (req, res) => {
   const { templateId, prenom, email } = req.body;
 
   if (!templateId || !prenom || !email) {
@@ -191,14 +176,10 @@ app.post('/api/send', upload.single('attachment'), async (req, res) => {
 
   const templates = await getTemplates();
   const template = templates.find(t => t.id === templateId);
-  if (!template) {
-    return res.status(404).json({ error: 'Template introuvable.' });
-  }
+  if (!template) return res.status(404).json({ error: 'Template introuvable.' });
 
   const gmail = await getGmailClient();
-  if (!gmail) {
-    return res.status(400).json({ error: 'Gmail non configuré. Va dans Configuration.' });
-  }
+  if (!gmail) return res.status(400).json({ error: 'Gmail non configuré. Va dans Configuration.' });
 
   const config = await getConfig();
   const signature = config.gmailSignature || '';
@@ -208,13 +189,30 @@ app.post('/api/send', upload.single('attachment'), async (req, res) => {
     ? `${bodyContent}<br><br><hr style="border:none;border-top:1px solid #e0e0e0;margin:16px 0;">${signature}`
     : bodyContent;
   const senderEmail = await getSenderEmail();
-  const raw = createRawEmail(senderEmail, email, subject, htmlBody, req.file || null);
+
+  // Fetch template attachment from URL if defined
+  let attachmentBuffer = null;
+  let attachmentMime = 'application/octet-stream';
+  let attachmentName = template.attachment_name || 'document';
+  if (template.attachment_url) {
+    try {
+      const fetchRes = await fetch(template.attachment_url);
+      if (fetchRes.ok) {
+        const arrayBuf = await fetchRes.arrayBuffer();
+        attachmentBuffer = Buffer.from(arrayBuf);
+        attachmentMime = fetchRes.headers.get('content-type') || attachmentMime;
+      }
+    } catch (err) {
+      console.error('Attachment fetch error:', err.message);
+    }
+  }
+
+  const raw = createRawEmail(senderEmail, email, subject, htmlBody,
+    attachmentBuffer ? { buffer: attachmentBuffer, mimetype: attachmentMime, originalname: attachmentName } : null
+  );
 
   try {
-    await gmail.users.messages.send({
-      userId: 'me',
-      requestBody: { raw }
-    });
+    await gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
     res.json({ success: true, message: `Email envoyé à ${email}` });
   } catch (err) {
     console.error('Erreur envoi Gmail:', err.message);
@@ -226,43 +224,24 @@ function createRawEmail(from, to, subject, htmlBody, file) {
   const boundary = `boundary_${Date.now()}`;
   const subjectEncoded = `=?UTF-8?B?${Buffer.from(subject).toString('base64')}?=`;
 
-  let message;
-
   if (file) {
     const fileB64 = file.buffer.toString('base64');
     const filenameEncoded = `=?UTF-8?B?${Buffer.from(file.originalname).toString('base64')}?=`;
-    message = [
-      `From: ${from}`,
-      `To: ${to}`,
-      `Subject: ${subjectEncoded}`,
-      'MIME-Version: 1.0',
-      `Content-Type: multipart/mixed; boundary="${boundary}"`,
-      '',
-      `--${boundary}`,
-      'Content-Type: text/html; charset=UTF-8',
-      '',
-      htmlBody,
-      '',
-      `--${boundary}`,
-      `Content-Type: ${file.mimetype}; name="${filenameEncoded}"`,
-      'Content-Transfer-Encoding: base64',
-      `Content-Disposition: attachment; filename="${filenameEncoded}"`,
-      '',
-      fileB64,
-      `--${boundary}--`
+    const message = [
+      `From: ${from}`, `To: ${to}`, `Subject: ${subjectEncoded}`,
+      'MIME-Version: 1.0', `Content-Type: multipart/mixed; boundary="${boundary}"`, '',
+      `--${boundary}`, 'Content-Type: text/html; charset=UTF-8', '', htmlBody, '',
+      `--${boundary}`, `Content-Type: ${file.mimetype}; name="${filenameEncoded}"`,
+      'Content-Transfer-Encoding: base64', `Content-Disposition: attachment; filename="${filenameEncoded}"`,
+      '', fileB64, `--${boundary}--`
     ].join('\r\n');
-  } else {
-    message = [
-      `From: ${from}`,
-      `To: ${to}`,
-      `Subject: ${subjectEncoded}`,
-      'MIME-Version: 1.0',
-      'Content-Type: text/html; charset=UTF-8',
-      '',
-      htmlBody
-    ].join('\r\n');
+    return Buffer.from(message).toString('base64url');
   }
 
+  const message = [
+    `From: ${from}`, `To: ${to}`, `Subject: ${subjectEncoded}`,
+    'MIME-Version: 1.0', 'Content-Type: text/html; charset=UTF-8', '', htmlBody
+  ].join('\r\n');
   return Buffer.from(message).toString('base64url');
 }
 

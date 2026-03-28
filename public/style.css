@@ -193,6 +193,16 @@ button:disabled {
   color: #ef4444;
 }
 
+.attachment-info {
+  padding: 10px 14px;
+  background: #111;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #999;
+  margin-bottom: 20px;
+}
+
 @media (max-width: 500px) {
   .row { flex-direction: column; gap: 0; }
   .container { padding: 24px; }

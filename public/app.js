@@ -3,11 +3,8 @@ let templates = [];
 const templateSelect = document.getElementById('template');
 const prenomInput = document.getElementById('prenom');
 const emailInput = document.getElementById('email');
-const attachmentInput = document.getElementById('attachment');
-const fileDisplay = document.getElementById('fileDisplay');
-const previewSection = document.getElementById('previewSection');
-const previewSubject = document.getElementById('previewSubject');
-const previewBody = document.getElementById('previewBody');
+const attachmentInfo = document.getElementById('attachmentInfo');
+const attachmentLabel = document.getElementById('attachmentLabel');
 const sendBtn = document.getElementById('sendBtn');
 const statusDiv = document.getElementById('status');
 const form = document.getElementById('emailForm');
@@ -23,31 +20,17 @@ async function loadTemplates() {
   });
 }
 
-function updatePreview() {
+function updateAttachmentInfo() {
   const t = templates.find(t => t.id === templateSelect.value);
-  if (!t) {
-    previewSection.style.display = 'none';
-    return;
+  if (t && t.attachment_url && t.attachment_name) {
+    attachmentLabel.textContent = `📎 ${t.attachment_name}`;
+    attachmentInfo.style.display = 'block';
+  } else {
+    attachmentInfo.style.display = 'none';
   }
-  const prenom = prenomInput.value || '{{prenom}}';
-  previewSubject.textContent = t.subject.replace(/\{\{prenom\}\}/g, prenom);
-  previewBody.innerHTML = t.body.replace(/\{\{prenom\}\}/g, prenom);
-  previewSection.style.display = 'block';
 }
 
-attachmentInput.addEventListener('change', () => {
-  const file = attachmentInput.files[0];
-  if (file) {
-    fileDisplay.textContent = file.name;
-    fileDisplay.classList.add('has-file');
-  } else {
-    fileDisplay.textContent = 'Aucun fichier sélectionné';
-    fileDisplay.classList.remove('has-file');
-  }
-});
-
-templateSelect.addEventListener('change', updatePreview);
-prenomInput.addEventListener('input', updatePreview);
+templateSelect.addEventListener('change', updateAttachmentInfo);
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -57,17 +40,14 @@ form.addEventListener('submit', async (e) => {
   statusDiv.style.display = 'none';
 
   try {
-    const formData = new FormData();
-    formData.append('templateId', templateSelect.value);
-    formData.append('prenom', prenomInput.value);
-    formData.append('email', emailInput.value);
-    if (attachmentInput.files[0]) {
-      formData.append('attachment', attachmentInput.files[0]);
-    }
-
     const res = await fetch('/api/send', {
       method: 'POST',
-      body: formData
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        templateId: templateSelect.value,
+        prenom: prenomInput.value,
+        email: emailInput.value
+      })
     });
 
     const data = await res.json();
@@ -77,10 +57,6 @@ form.addEventListener('submit', async (e) => {
       statusDiv.textContent = data.message;
       emailInput.value = '';
       prenomInput.value = '';
-      attachmentInput.value = '';
-      fileDisplay.textContent = 'Aucun fichier sélectionné';
-      fileDisplay.classList.remove('has-file');
-      updatePreview();
     } else {
       statusDiv.className = 'status error';
       statusDiv.textContent = data.error;

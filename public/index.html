@@ -35,19 +35,8 @@
         </div>
       </div>
 
-      <div class="field">
-        <label for="attachment">Pièce jointe <span style="color:#666;font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;">(optionnel)</span></label>
-        <div class="file-input-wrapper">
-          <input type="file" id="attachment" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg">
-          <div class="file-display" id="fileDisplay">Aucun fichier sélectionné</div>
-          <button type="button" class="file-btn" onclick="document.getElementById('attachment').click()">Choisir</button>
-        </div>
-      </div>
-
-      <div class="preview-section" id="previewSection" style="display:none;">
-        <h3>Aperçu</h3>
-        <div class="preview-subject" id="previewSubject"></div>
-        <div class="preview-body" id="previewBody"></div>
+      <div id="attachmentInfo" class="attachment-info" style="display:none;">
+        <span id="attachmentLabel"></span>
       </div>
 
       <button type="submit" id="sendBtn">Envoyer</button>
