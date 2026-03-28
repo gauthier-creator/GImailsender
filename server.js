@@ -81,6 +81,24 @@ app.get('/api/config/signature', async (req, res) => {
   res.json({ signature: config.gmailSignature || '' });
 });
 
+app.get('/api/config/signature/import', async (req, res) => {
+  const gmail = await getGmailClient();
+  if (!gmail) {
+    return res.status(400).json({ error: 'Gmail non configuré.' });
+  }
+  const senderEmail = await getSenderEmail();
+  try {
+    const response = await gmail.users.settings.sendAs.get({
+      userId: 'me',
+      sendAsEmail: senderEmail
+    });
+    const signature = response.data.signature || '';
+    res.json({ signature });
+  } catch (err) {
+    res.status(500).json({ error: `Impossible de récupérer la signature : ${err.message}` });
+  }
+});
+
 app.post('/api/config/signature', async (req, res) => {
   const { signature } = req.body;
   const config = await getConfig();
@@ -124,7 +142,7 @@ app.get('/api/config/oauth/start', async (req, res) => {
 
   const authUrl = oauth2Client.generateAuthUrl({
     access_type: 'offline',
-    scope: ['https://www.googleapis.com/auth/gmail.send'],
+    scope: ['https://www.googleapis.com/auth/gmail.send', 'https://www.googleapis.com/auth/gmail.settings.basic'],
     prompt: 'consent'
   });
 

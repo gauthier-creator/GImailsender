@@ -70,7 +70,10 @@
         <textarea id="sigInput" rows="10" placeholder="-- &#10;&#10;Ton Prénom NOM&#10;Ton titre, Ton entreprise&#10;&#10;+33 6 XX XX XX XX | ton-site.com&#10;ton-email@exemple.com"></textarea>
       </div>
 
-      <button id="saveSignature" class="btn">Sauvegarder</button>
+      <div style="display:flex;gap:10px;margin-bottom:0;">
+        <button id="importSignature" class="btn btn-ghost" style="flex:1;">Importer depuis Gmail</button>
+        <button id="saveSignature" class="btn" style="flex:1;">Sauvegarder</button>
+      </div>
 
       <div id="sigPreviewSection" style="display:none; margin-top:24px;">
         <h3>Aperçu</h3>

@@ -228,6 +228,29 @@ sigInput.addEventListener('input', () => {
   }
 });
 
+document.getElementById('importSignature').addEventListener('click', async () => {
+  const btn = document.getElementById('importSignature');
+  btn.disabled = true;
+  btn.textContent = 'Import en cours...';
+
+  const res = await fetch('/api/config/signature/import');
+  const data = await res.json();
+
+  btn.disabled = false;
+  btn.textContent = 'Importer depuis Gmail';
+
+  if (res.ok && data.signature) {
+    sigInput.value = data.signature;
+    sigPreview.innerHTML = data.signature;
+    sigPreviewSection.style.display = 'block';
+  } else {
+    sigStatus.style.display = 'block';
+    sigStatus.className = 'status error';
+    sigStatus.textContent = data.error || 'Aucune signature trouvée sur ce compte Gmail.';
+    setTimeout(() => { sigStatus.style.display = 'none'; }, 4000);
+  }
+});
+
 document.getElementById('saveSignature').addEventListener('click', async () => {
   const res = await fetch('/api/config/signature', {
     method: 'POST',
