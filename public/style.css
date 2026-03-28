@@ -1,0 +1,158 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #0f0f0f;
+  color: #e0e0e0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.container {
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+  padding: 40px;
+  width: 100%;
+  max-width: 640px;
+}
+
+h1 {
+  font-size: 24px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.subtitle {
+  color: #666;
+  font-size: 14px;
+  margin-bottom: 32px;
+}
+
+.field {
+  margin-bottom: 20px;
+  flex: 1;
+}
+
+.row {
+  display: flex;
+  gap: 16px;
+}
+
+label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: #999;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+select, input {
+  width: 100%;
+  padding: 12px 14px;
+  background: #111;
+  border: 1px solid #333;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+select:focus, input:focus {
+  border-color: #4a9eff;
+}
+
+select option {
+  background: #1a1a1a;
+}
+
+.preview-section {
+  margin: 24px 0;
+  padding: 20px;
+  background: #111;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+}
+
+.preview-section h3 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #666;
+  margin-bottom: 12px;
+}
+
+.preview-subject {
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #2a2a2a;
+  font-size: 15px;
+}
+
+.preview-body {
+  color: #ccc;
+  font-size: 14px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+button {
+  width: 100%;
+  padding: 14px;
+  background: #4a9eff;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+button:hover {
+  background: #3a8eef;
+}
+
+button:disabled {
+  background: #333;
+  color: #666;
+  cursor: not-allowed;
+}
+
+.status {
+  margin-top: 16px;
+  padding: 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  text-align: center;
+}
+
+.status.success {
+  background: #0a2e1a;
+  border: 1px solid #1a5c35;
+  color: #4ade80;
+}
+
+.status.error {
+  background: #2e0a0a;
+  border: 1px solid #5c1a1a;
+  color: #ef4444;
+}
+
+@media (max-width: 500px) {
+  .row { flex-direction: column; gap: 0; }
+  .container { padding: 24px; }
+}

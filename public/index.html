@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GMailSender</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>GMailSender</h1>
+    <p class="subtitle">Envoi rapide d'emails post cold-call</p>
+
+    <form id="emailForm">
+      <div class="field">
+        <label for="template">Template</label>
+        <select id="template" required>
+          <option value="">Choisir un template...</option>
+        </select>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="prenom">Prénom du contact</label>
+          <input type="text" id="prenom" placeholder="Jean-Pierre" required>
+        </div>
+        <div class="field">
+          <label for="email">Email du contact</label>
+          <input type="email" id="email" placeholder="contact@exemple.com" required>
+        </div>
+      </div>
+
+      <div class="preview-section" id="previewSection" style="display:none;">
+        <h3>Aperçu</h3>
+        <div class="preview-subject" id="previewSubject"></div>
+        <div class="preview-body" id="previewBody"></div>
+      </div>
+
+      <button type="submit" id="sendBtn">Envoyer</button>
+    </form>
+
+    <div id="status" class="status" style="display:none;"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
