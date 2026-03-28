@@ -55,6 +55,7 @@ document.getElementById('saveCredentials').addEventListener('click', async () =>
   const gmailClientId = document.getElementById('clientId').value.trim();
   const gmailClientSecret = document.getElementById('clientSecret').value.trim();
   const gmailUser = document.getElementById('gmailUser').value.trim();
+  const gmailDisplayName = document.getElementById('gmailDisplayName').value.trim();
 
   if (!gmailClientId || !gmailClientSecret || !gmailUser) {
     alert('Remplis tous les champs.');
@@ -64,7 +65,7 @@ document.getElementById('saveCredentials').addEventListener('click', async () =>
   const res = await fetch('/api/config/credentials', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ gmailClientId, gmailClientSecret, gmailUser })
+    body: JSON.stringify({ gmailClientId, gmailClientSecret, gmailUser, gmailDisplayName })
   });
 
   if (res.ok) {

@@ -28,9 +28,11 @@ async function getGmailClient() {
   return google.gmail({ version: 'v1', auth: oauth2Client });
 }
 
-async function getSenderEmail() {
+async function getSenderHeader() {
   const config = await getConfig();
-  return config.gmailUser || process.env.GMAIL_USER;
+  const email = config.gmailUser || process.env.GMAIL_USER || '';
+  const name = config.gmailDisplayName || process.env.GMAIL_DISPLAY_NAME || '';
+  return name ? `=?UTF-8?B?${Buffer.from(name).toString('base64')}?= <${email}>` : email;
 }
 
 // ============ TEMPLATES API ============
@@ -105,13 +107,14 @@ app.get('/api/config/status', async (req, res) => {
 });
 
 app.post('/api/config/credentials', async (req, res) => {
-  const { gmailClientId, gmailClientSecret, gmailUser } = req.body;
+  const { gmailClientId, gmailClientSecret, gmailUser, gmailDisplayName } = req.body;
   if (!gmailClientId || !gmailClientSecret || !gmailUser) {
     return res.status(400).json({ error: 'Tous les champs sont requis.' });
   }
   await setConfigKey('gmailClientId', gmailClientId);
   await setConfigKey('gmailClientSecret', gmailClientSecret);
   await setConfigKey('gmailUser', gmailUser);
+  if (gmailDisplayName) await setConfigKey('gmailDisplayName', gmailDisplayName);
   res.json({ success: true });
 });
 
@@ -188,7 +191,7 @@ app.post('/api/send', express.json(), async (req, res) => {
   const htmlBody = signature
     ? `${bodyContent}<br><br><hr style="border:none;border-top:1px solid #e0e0e0;margin:16px 0;">${signature}`
     : bodyContent;
-  const senderEmail = await getSenderEmail();
+  const senderEmail = await getSenderHeader();
 
   // Fetch template attachment from URL if defined
   let attachmentBuffer = null;
