@@ -3,6 +3,8 @@ let templates = [];
 const templateSelect = document.getElementById('template');
 const prenomInput = document.getElementById('prenom');
 const emailInput = document.getElementById('email');
+const attachmentInput = document.getElementById('attachment');
+const fileDisplay = document.getElementById('fileDisplay');
 const previewSection = document.getElementById('previewSection');
 const previewSubject = document.getElementById('previewSubject');
 const previewBody = document.getElementById('previewBody');
@@ -33,6 +35,17 @@ function updatePreview() {
   previewSection.style.display = 'block';
 }
 
+attachmentInput.addEventListener('change', () => {
+  const file = attachmentInput.files[0];
+  if (file) {
+    fileDisplay.textContent = file.name;
+    fileDisplay.classList.add('has-file');
+  } else {
+    fileDisplay.textContent = 'Aucun fichier sélectionné';
+    fileDisplay.classList.remove('has-file');
+  }
+});
+
 templateSelect.addEventListener('change', updatePreview);
 prenomInput.addEventListener('input', updatePreview);
 
@@ -44,14 +57,17 @@ form.addEventListener('submit', async (e) => {
   statusDiv.style.display = 'none';
 
   try {
+    const formData = new FormData();
+    formData.append('templateId', templateSelect.value);
+    formData.append('prenom', prenomInput.value);
+    formData.append('email', emailInput.value);
+    if (attachmentInput.files[0]) {
+      formData.append('attachment', attachmentInput.files[0]);
+    }
+
     const res = await fetch('/api/send', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        templateId: templateSelect.value,
-        prenom: prenomInput.value,
-        email: emailInput.value
-      })
+      body: formData
     });
 
     const data = await res.json();
@@ -61,6 +77,9 @@ form.addEventListener('submit', async (e) => {
       statusDiv.textContent = data.message;
       emailInput.value = '';
       prenomInput.value = '';
+      attachmentInput.value = '';
+      fileDisplay.textContent = 'Aucun fichier sélectionné';
+      fileDisplay.classList.remove('has-file');
       updatePreview();
     } else {
       statusDiv.className = 'status error';

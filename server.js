@@ -1,11 +1,14 @@
 require('dotenv').config();
 const express = require('express');
 const { google } = require('googleapis');
+const multer = require('multer');
 const { getConfig, saveConfig, getTemplates, addTemplate, updateTemplate, deleteTemplate } = require('./store');
 
 const app = express();
 app.use(express.json());
 app.use(express.static('public'));
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 const PORT = process.env.PORT || 3000;
 
@@ -148,7 +151,7 @@ app.post('/api/config/disconnect', async (req, res) => {
 
 // ============ SEND EMAIL ============
 
-app.post('/api/send', async (req, res) => {
+app.post('/api/send', upload.single('attachment'), async (req, res) => {
   const { templateId, prenom, email } = req.body;
 
   if (!templateId || !prenom || !email) {
@@ -169,7 +172,7 @@ app.post('/api/send', async (req, res) => {
   const subject = template.subject.replace(/\{\{prenom\}\}/g, prenom);
   const htmlBody = template.body.replace(/\{\{prenom\}\}/g, prenom);
   const senderEmail = await getSenderEmail();
-  const raw = createRawEmail(senderEmail, email, subject, htmlBody);
+  const raw = createRawEmail(senderEmail, email, subject, htmlBody, req.file || null);
 
   try {
     await gmail.users.messages.send({
@@ -183,17 +186,47 @@ app.post('/api/send', async (req, res) => {
   }
 });
 
-function createRawEmail(from, to, subject, htmlBody) {
-  const messageParts = [
-    `From: ${from}`,
-    `To: ${to}`,
-    `Subject: =?UTF-8?B?${Buffer.from(subject).toString('base64')}?=`,
-    'MIME-Version: 1.0',
-    'Content-Type: text/html; charset=UTF-8',
-    '',
-    htmlBody
-  ];
-  const message = messageParts.join('\r\n');
+function createRawEmail(from, to, subject, htmlBody, file) {
+  const boundary = `boundary_${Date.now()}`;
+  const subjectEncoded = `=?UTF-8?B?${Buffer.from(subject).toString('base64')}?=`;
+
+  let message;
+
+  if (file) {
+    const fileB64 = file.buffer.toString('base64');
+    const filenameEncoded = `=?UTF-8?B?${Buffer.from(file.originalname).toString('base64')}?=`;
+    message = [
+      `From: ${from}`,
+      `To: ${to}`,
+      `Subject: ${subjectEncoded}`,
+      'MIME-Version: 1.0',
+      `Content-Type: multipart/mixed; boundary="${boundary}"`,
+      '',
+      `--${boundary}`,
+      'Content-Type: text/html; charset=UTF-8',
+      '',
+      htmlBody,
+      '',
+      `--${boundary}`,
+      `Content-Type: ${file.mimetype}; name="${filenameEncoded}"`,
+      'Content-Transfer-Encoding: base64',
+      `Content-Disposition: attachment; filename="${filenameEncoded}"`,
+      '',
+      fileB64,
+      `--${boundary}--`
+    ].join('\r\n');
+  } else {
+    message = [
+      `From: ${from}`,
+      `To: ${to}`,
+      `Subject: ${subjectEncoded}`,
+      'MIME-Version: 1.0',
+      'Content-Type: text/html; charset=UTF-8',
+      '',
+      htmlBody
+    ].join('\r\n');
+  }
+
   return Buffer.from(message).toString('base64url');
 }
 
