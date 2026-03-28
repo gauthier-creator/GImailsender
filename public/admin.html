@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GMailSender — Admin</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="config.css">
+  <style>
+    .user-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+    .user-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #666; padding: 8px 12px; border-bottom: 1px solid #2a2a2a; }
+    .user-table td { padding: 12px; border-bottom: 1px solid #1a1a1a; font-size: 14px; color: #ccc; }
+    .user-table tr:hover td { background: #111; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .badge-green { background: #0a2e1a; color: #4ade80; border: 1px solid #1a5c35; }
+    .badge-yellow { background: #2e2a0a; color: #fbbf24; border: 1px solid #5c4f1a; }
+    .badge-admin { background: #1a1a3a; color: #818cf8; border: 1px solid #3a3a7a; }
+    .delete-user { background: none; border: 1px solid #333; color: #999; width: auto; padding: 4px 10px; font-size: 12px; border-radius: 4px; cursor: pointer; }
+    .delete-user:hover { border-color: #ef4444; color: #ef4444; }
+  </style>
+</head>
+<body>
+  <div class="container config-container">
+    <div class="header">
+      <div>
+        <h1>Administration</h1>
+        <p class="subtitle">Gestion des utilisateurs</p>
+      </div>
+      <div style="display:flex;gap:12px;align-items:center;">
+        <a href="/" class="back-link">← App</a>
+        <a href="/config.html" class="back-link">Config</a>
+        <button onclick="logout()" class="btn btn-ghost" style="padding:6px 12px;font-size:13px;width:auto;">Déconnexion</button>
+      </div>
+    </div>
+
+    <div style="background:#111;border:1px solid #2a2a2a;border-radius:8px;padding:20px;margin-bottom:24px;">
+      <h3 style="margin-bottom:12px;">Inviter un utilisateur</h3>
+      <div style="display:flex;gap:10px;">
+        <input type="email" id="inviteEmail" placeholder="sales@globalicons.io" style="flex:1;">
+        <button id="inviteBtn" class="btn" style="width:auto;padding:12px 20px;">Inviter</button>
+      </div>
+      <p class="help-text" style="margin-top:10px;margin-bottom:0;">Un email d'invitation sera envoyé. L'utilisateur définit son mot de passe en cliquant sur le lien.</p>
+      <div id="inviteStatus" class="status" style="display:none;margin-top:10px;"></div>
+    </div>
+
+    <h3>Utilisateurs <span id="userCount" style="color:#666;font-weight:400;font-size:14px;"></span></h3>
+    <table class="user-table">
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Statut</th>
+          <th>Dernière connexion</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="userList"><tr><td colspan="4" style="color:#666;text-align:center;">Chargement...</td></tr></tbody>
+    </table>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="auth.js"></script>
+  <script>
+    let session;
+
+    (async () => {
+      session = await requireLogin();
+      if (!session) return;
+      loadUsers();
+    })();
+
+    async function loadUsers() {
+      const res = await fetch('/api/admin/users', { headers: authHeaders(session) });
+      if (res.status === 403) {
+        document.body.innerHTML = '<div class="container"><p style="color:#ef4444;margin-top:40px;">Accès réservé aux administrateurs.</p></div>';
+        return;
+      }
+      const users = await res.json();
+      document.getElementById('userCount').textContent = `(${users.length})`;
+      document.getElementById('userList').innerHTML = users.map(u => `
+        <tr>
+          <td>
+            ${u.email}
+            ${u.is_admin ? '<span class="badge badge-admin" style="margin-left:6px;">admin</span>' : ''}
+          </td>
+          <td>
+            ${u.confirmed
+              ? '<span class="badge badge-green">Actif</span>'
+              : '<span class="badge badge-yellow">En attente</span>'}
+          </td>
+          <td style="color:#666;">${u.last_sign_in ? new Date(u.last_sign_in).toLocaleDateString('fr-FR', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) : '—'}</td>
+          <td>
+            ${u.id !== session.user.id ? `<button class="delete-user" onclick="deleteUser('${u.id}', '${u.email}')">Supprimer</button>` : ''}
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    document.getElementById('inviteBtn').addEventListener('click', async () => {
+      const email = document.getElementById('inviteEmail').value.trim();
+      const status = document.getElementById('inviteStatus');
+      if (!email) return;
+
+      document.getElementById('inviteBtn').disabled = true;
+      document.getElementById('inviteBtn').textContent = 'Envoi...';
+
+      const res = await fetch('/api/admin/invite', {
+        method: 'POST',
+        headers: authHeaders(session),
+        body: JSON.stringify({ email })
+      });
+      const data = await res.json();
+      status.style.display = 'block';
+      if (res.ok) {
+        status.className = 'status success';
+        status.textContent = `Invitation envoyée à ${email}`;
+        document.getElementById('inviteEmail').value = '';
+        loadUsers();
+      } else {
+        status.className = 'status error';
+        status.textContent = data.error;
+      }
+      document.getElementById('inviteBtn').disabled = false;
+      document.getElementById('inviteBtn').textContent = 'Inviter';
+      setTimeout(() => { status.style.display = 'none'; }, 4000);
+    });
+
+    async function deleteUser(id, email) {
+      if (!confirm(`Supprimer l'utilisateur ${email} ?`)) return;
+      await fetch(`/api/admin/users/${id}`, { method: 'DELETE', headers: authHeaders(session) });
+      loadUsers();
+    }
+  </script>
+</body>
+</html>

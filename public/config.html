@@ -14,7 +14,10 @@
         <h1>Configuration</h1>
         <p class="subtitle">Connecte ton Gmail et gère tes templates</p>
       </div>
-      <a href="/" class="back-link">← Retour</a>
+      <div style="display:flex;gap:12px;align-items:center;">
+        <a href="/" class="back-link">← Retour</a>
+        <button onclick="logout()" class="btn btn-ghost" style="padding:6px 12px;font-size:13px;width:auto;">Déconnexion</button>
+      </div>
     </div>
 
     <!-- TABS -->
@@ -140,6 +143,8 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="auth.js"></script>
   <script src="config.js"></script>
 </body>
 </html>

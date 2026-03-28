@@ -1,4 +1,5 @@
 let templates = [];
+let session;
 
 const templateSelect = document.getElementById('template');
 const prenomInput = document.getElementById('prenom');
@@ -9,8 +10,20 @@ const sendBtn = document.getElementById('sendBtn');
 const statusDiv = document.getElementById('status');
 const form = document.getElementById('emailForm');
 
+(async () => {
+  session = await requireLogin();
+  if (!session) return;
+
+  document.getElementById('userEmail').textContent = session.user.email;
+  if (session.user.user_metadata?.is_admin) {
+    document.getElementById('adminLink').style.display = 'inline';
+  }
+
+  await loadTemplates();
+})();
+
 async function loadTemplates() {
-  const res = await fetch('/api/templates');
+  const res = await fetch('/api/templates', { headers: authHeaders(session) });
   templates = await res.json();
   templates.forEach(t => {
     const opt = document.createElement('option');
@@ -34,7 +47,6 @@ templateSelect.addEventListener('change', updateAttachmentInfo);
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
-
   sendBtn.disabled = true;
   sendBtn.textContent = 'Envoi en cours...';
   statusDiv.style.display = 'none';
@@ -42,16 +54,14 @@ form.addEventListener('submit', async (e) => {
   try {
     const res = await fetch('/api/send', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(session),
       body: JSON.stringify({
         templateId: templateSelect.value,
         prenom: prenomInput.value,
         email: emailInput.value
       })
     });
-
     const data = await res.json();
-
     if (res.ok) {
       statusDiv.className = 'status success';
       statusDiv.textContent = data.message;
@@ -70,5 +80,3 @@ form.addEventListener('submit', async (e) => {
   sendBtn.disabled = false;
   sendBtn.textContent = 'Envoyer';
 });
-
-loadTemplates();

@@ -8,12 +8,17 @@
 </head>
 <body>
   <div class="container">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
       <div>
         <h1>GMailSender</h1>
         <p class="subtitle">Envoi rapide d'emails post cold-call</p>
       </div>
-      <a href="/config.html" style="color:#4a9eff;text-decoration:none;font-size:14px;margin-top:4px;">Configuration</a>
+      <div style="display:flex;gap:12px;align-items:center;margin-top:4px;">
+        <span id="userEmail" style="color:#666;font-size:13px;"></span>
+        <a href="/config.html" style="color:#4a9eff;text-decoration:none;font-size:13px;">Config</a>
+        <a id="adminLink" href="/admin.html" style="color:#818cf8;text-decoration:none;font-size:13px;display:none;">Admin</a>
+        <button onclick="logout()" style="background:none;border:1px solid #333;color:#999;width:auto;padding:4px 10px;font-size:12px;border-radius:6px;cursor:pointer;">Déco</button>
+      </div>
     </div>
 
     <form id="emailForm">
@@ -45,6 +50,8 @@
     <div id="status" class="status" style="display:none;"></div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="auth.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

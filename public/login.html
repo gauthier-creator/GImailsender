@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GMailSender — Connexion</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .login-container {
+      max-width: 400px;
+      margin: 0 auto;
+    }
+    .login-logo {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .login-logo h1 { font-size: 28px; margin-bottom: 4px; }
+    .login-logo p { color: #666; font-size: 14px; }
+    .divider {
+      border: none;
+      border-top: 1px solid #2a2a2a;
+      margin: 20px 0;
+    }
+    .forgot { text-align: right; font-size: 12px; margin-top: -12px; margin-bottom: 20px; }
+    .forgot a { color: #666; text-decoration: none; }
+    .forgot a:hover { color: #4a9eff; }
+  </style>
+</head>
+<body>
+  <div class="container login-container">
+    <div class="login-logo">
+      <h1>GMailSender</h1>
+      <p>Connecte-toi pour accéder à l'outil</p>
+    </div>
+
+    <div id="loginForm">
+      <div class="field">
+        <label for="email">Email</label>
+        <input type="email" id="loginEmail" placeholder="ton-email@globalicons.io" autofocus>
+      </div>
+      <div class="field">
+        <label for="password">Mot de passe</label>
+        <input type="password" id="loginPassword" placeholder="••••••••">
+      </div>
+      <div class="forgot"><a href="#" id="forgotLink">Mot de passe oublié ?</a></div>
+      <button id="loginBtn">Se connecter</button>
+      <div id="loginStatus" class="status" style="display:none;margin-top:12px;"></div>
+    </div>
+
+    <div id="resetForm" style="display:none;">
+      <p style="color:#999;font-size:14px;margin-bottom:20px;">Saisis ton email, tu recevras un lien pour réinitialiser ton mot de passe.</p>
+      <div class="field">
+        <label for="resetEmail">Email</label>
+        <input type="email" id="resetEmail" placeholder="ton-email@globalicons.io">
+      </div>
+      <button id="resetBtn">Envoyer le lien</button>
+      <div id="resetStatus" class="status" style="display:none;margin-top:12px;"></div>
+      <hr class="divider">
+      <a href="#" id="backToLogin" style="color:#4a9eff;font-size:14px;">← Retour à la connexion</a>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="auth.js"></script>
+  <script>
+    (async () => {
+      // Already logged in?
+      const session = await getSession();
+      if (session) window.location.href = '/';
+    })();
+
+    document.getElementById('loginBtn').addEventListener('click', async () => {
+      const email = document.getElementById('loginEmail').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      const status = document.getElementById('loginStatus');
+      const btn = document.getElementById('loginBtn');
+
+      btn.disabled = true;
+      btn.textContent = 'Connexion...';
+      status.style.display = 'none';
+
+      const sb = await getSupabase();
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+
+      if (error) {
+        status.className = 'status error';
+        status.textContent = error.message === 'Invalid login credentials'
+          ? 'Email ou mot de passe incorrect.'
+          : error.message;
+        status.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Se connecter';
+      } else {
+        window.location.href = '/';
+      }
+    });
+
+    document.getElementById('loginPassword').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('loginBtn').click();
+    });
+
+    document.getElementById('forgotLink').addEventListener('click', (e) => {
+      e.preventDefault();
+      document.getElementById('loginForm').style.display = 'none';
+      document.getElementById('resetForm').style.display = 'block';
+    });
+
+    document.getElementById('backToLogin').addEventListener('click', (e) => {
+      e.preventDefault();
+      document.getElementById('resetForm').style.display = 'none';
+      document.getElementById('loginForm').style.display = 'block';
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', async () => {
+      const email = document.getElementById('resetEmail').value.trim();
+      const status = document.getElementById('resetStatus');
+      const sb = await getSupabase();
+      const { error } = await sb.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/login.html`
+      });
+      status.style.display = 'block';
+      if (error) {
+        status.className = 'status error';
+        status.textContent = error.message;
+      } else {
+        status.className = 'status success';
+        status.textContent = 'Lien envoyé ! Vérifie ta boîte mail.';
+      }
+    });
+  </script>
+</body>
+</html>

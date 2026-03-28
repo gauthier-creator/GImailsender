@@ -1,3 +1,13 @@
+let session;
+
+(async () => {
+  session = await requireLogin();
+  if (!session) return;
+  checkStatus();
+  loadTemplates();
+  loadSignature();
+})();
+
 // --- Tabs ---
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
@@ -11,28 +21,22 @@ document.querySelectorAll('.tab').forEach(tab => {
 // --- Gmail Config ---
 const statusCard = document.getElementById('gmailStatus');
 const statusText = statusCard.querySelector('.status-text');
-const credentialsForm = document.getElementById('credentialsForm');
 const connectSection = document.getElementById('connectSection');
 const disconnectSection = document.getElementById('disconnectSection');
 
-// Show redirect URI
 document.getElementById('redirectUri').textContent =
   `${window.location.origin}/api/config/oauth/callback`;
 
-// Check URL params for OAuth result
 const params = new URLSearchParams(window.location.search);
-if (params.get('connected') === 'true') {
-  history.replaceState(null, '', '/config.html');
-}
+if (params.get('connected') === 'true') history.replaceState(null, '', '/config.html');
 if (params.get('error')) {
   alert(`Erreur OAuth : ${decodeURIComponent(params.get('error'))}`);
   history.replaceState(null, '', '/config.html');
 }
 
 async function checkStatus() {
-  const res = await fetch('/api/config/status');
+  const res = await fetch('/api/config/status', { headers: authHeaders(session) });
   const data = await res.json();
-
   if (data.connected) {
     statusCard.className = 'status-card connected';
     statusText.textContent = `Connecté — ${data.gmailUser}`;
@@ -56,57 +60,40 @@ document.getElementById('saveCredentials').addEventListener('click', async () =>
   const gmailClientSecret = document.getElementById('clientSecret').value.trim();
   const gmailUser = document.getElementById('gmailUser').value.trim();
   const gmailDisplayName = document.getElementById('gmailDisplayName').value.trim();
-
-  if (!gmailClientId || !gmailClientSecret || !gmailUser) {
-    alert('Remplis tous les champs.');
-    return;
-  }
-
+  if (!gmailClientId || !gmailClientSecret || !gmailUser) { alert('Remplis tous les champs.'); return; }
   const res = await fetch('/api/config/credentials', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(session),
     body: JSON.stringify({ gmailClientId, gmailClientSecret, gmailUser, gmailDisplayName })
   });
-
-  if (res.ok) {
-    checkStatus();
-  } else {
-    const data = await res.json();
-    alert(data.error);
-  }
+  if (res.ok) checkStatus();
+  else alert((await res.json()).error);
 });
 
 document.getElementById('connectGmail').addEventListener('click', async () => {
-  const res = await fetch('/api/config/oauth/start');
+  const res = await fetch('/api/config/oauth/start', { headers: authHeaders(session) });
   const data = await res.json();
-  if (data.authUrl) {
-    window.location.href = data.authUrl;
-  } else {
-    alert(data.error);
-  }
+  if (data.authUrl) window.location.href = data.authUrl;
+  else alert(data.error);
 });
 
 document.getElementById('disconnectGmail').addEventListener('click', async () => {
   if (!confirm('Déconnecter Gmail ?')) return;
-  await fetch('/api/config/disconnect', { method: 'POST' });
+  await fetch('/api/config/disconnect', { method: 'POST', headers: authHeaders(session) });
   checkStatus();
 });
-
-checkStatus();
 
 // --- Templates ---
 let editingTemplateId = null;
 
 async function loadTemplates() {
-  const res = await fetch('/api/templates');
+  const res = await fetch('/api/templates', { headers: authHeaders(session) });
   const templates = await res.json();
   const list = document.getElementById('templatesList');
-
   if (templates.length === 0) {
     list.innerHTML = '<p style="color:#666;text-align:center;padding:40px 0;">Aucun template. Clique "+ Nouveau" pour en créer un.</p>';
     return;
   }
-
   list.innerHTML = templates.map(t => `
     <div class="template-card" data-id="${t.id}">
       <div class="template-card-header">
@@ -158,24 +145,15 @@ document.getElementById('addTemplate').addEventListener('click', () => {
   modal.style.display = 'flex';
 });
 
-document.getElementById('closeModal').addEventListener('click', () => {
-  modal.style.display = 'none';
-});
-
-document.getElementById('cancelTemplate').addEventListener('click', () => {
-  modal.style.display = 'none';
-});
-
-modal.addEventListener('click', (e) => {
-  if (e.target === modal) modal.style.display = 'none';
-});
+document.getElementById('closeModal').addEventListener('click', () => { modal.style.display = 'none'; });
+document.getElementById('cancelTemplate').addEventListener('click', () => { modal.style.display = 'none'; });
+modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
 
 window.editTemplate = async function(id) {
-  const res = await fetch('/api/templates');
+  const res = await fetch('/api/templates', { headers: authHeaders(session) });
   const templates = await res.json();
   const t = templates.find(tpl => tpl.id === id);
   if (!t) return;
-
   editingTemplateId = id;
   modalTitle.textContent = 'Modifier le template';
   document.getElementById('tplName').value = t.name;
@@ -187,7 +165,7 @@ window.editTemplate = async function(id) {
 
 window.deleteTemplate = async function(id) {
   if (!confirm('Supprimer ce template ?')) return;
-  await fetch(`/api/templates/${id}`, { method: 'DELETE' });
+  await fetch(`/api/templates/${id}`, { method: 'DELETE', headers: authHeaders(session) });
   loadTemplates();
 };
 
@@ -195,33 +173,21 @@ document.getElementById('saveTemplate').addEventListener('click', async () => {
   const name = document.getElementById('tplName').value.trim();
   const subject = document.getElementById('tplSubject').value.trim();
   const body = document.getElementById('tplBody').value;
-
-  if (!name || !subject || !body) {
-    alert('Remplis tous les champs.');
-    return;
-  }
-
+  if (!name || !subject || !body) { alert('Remplis tous les champs.'); return; }
   const payload = { name, subject, body };
-
   if (editingTemplateId) {
     await fetch(`/api/templates/${editingTemplateId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      method: 'PUT', headers: authHeaders(session), body: JSON.stringify(payload)
     });
   } else {
     await fetch('/api/templates', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      method: 'POST', headers: authHeaders(session), body: JSON.stringify(payload)
     });
   }
-
   modal.style.display = 'none';
   loadTemplates();
 });
 
-// Attachment upload handlers
 document.getElementById('pickAttachment').addEventListener('click', () => {
   document.getElementById('tplAttachmentFile').click();
 });
@@ -229,41 +195,32 @@ document.getElementById('pickAttachment').addEventListener('click', () => {
 document.getElementById('tplAttachmentFile').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file || !editingTemplateId) return;
-
   const uploading = document.getElementById('attachmentUploading');
   const empty = document.getElementById('attachmentEmpty');
   uploading.style.display = 'block';
   empty.style.display = 'none';
-
   const formData = new FormData();
   formData.append('file', file);
-
   const res = await fetch(`/api/templates/${editingTemplateId}/attachment`, {
     method: 'POST',
+    headers: { 'Authorization': `Bearer ${session.access_token}` },
     body: formData
   });
   const data = await res.json();
   uploading.style.display = 'none';
-
-  if (res.ok) {
-    setAttachmentUI(data.attachment_name, data.attachment_url);
-    loadTemplates();
-  } else {
-    empty.style.display = 'block';
-    alert('Erreur upload : ' + data.error);
-  }
+  if (res.ok) { setAttachmentUI(data.attachment_name, data.attachment_url); loadTemplates(); }
+  else { empty.style.display = 'block'; alert('Erreur upload : ' + data.error); }
   e.target.value = '';
 });
 
 document.getElementById('removeAttachment').addEventListener('click', async () => {
-  if (!editingTemplateId) return;
-  if (!confirm('Supprimer la pièce jointe ?')) return;
-  await fetch(`/api/templates/${editingTemplateId}/attachment`, { method: 'DELETE' });
+  if (!editingTemplateId || !confirm('Supprimer la pièce jointe ?')) return;
+  await fetch(`/api/templates/${editingTemplateId}/attachment`, {
+    method: 'DELETE', headers: authHeaders(session)
+  });
   setAttachmentUI(null, null);
   loadTemplates();
 });
-
-loadTemplates();
 
 // --- Signature ---
 const sigInput = document.getElementById('sigInput');
@@ -272,7 +229,7 @@ const sigPreview = document.getElementById('sigPreview');
 const sigStatus = document.getElementById('sigStatus');
 
 async function loadSignature() {
-  const res = await fetch('/api/config/signature');
+  const res = await fetch('/api/config/signature', { headers: authHeaders(session) });
   const data = await res.json();
   if (data.signature) {
     sigInput.value = data.signature;
@@ -283,25 +240,18 @@ async function loadSignature() {
 
 sigInput.addEventListener('input', () => {
   const val = sigInput.value.trim();
-  if (val) {
-    sigPreview.innerHTML = val;
-    sigPreviewSection.style.display = 'block';
-  } else {
-    sigPreviewSection.style.display = 'none';
-  }
+  sigPreview.innerHTML = val;
+  sigPreviewSection.style.display = val ? 'block' : 'none';
 });
 
 document.getElementById('importSignature').addEventListener('click', async () => {
   const btn = document.getElementById('importSignature');
   btn.disabled = true;
   btn.textContent = 'Import en cours...';
-
-  const res = await fetch('/api/config/signature/import');
+  const res = await fetch('/api/config/signature/import', { headers: authHeaders(session) });
   const data = await res.json();
-
   btn.disabled = false;
   btn.textContent = 'Importer depuis Gmail';
-
   if (res.ok && data.signature) {
     sigInput.value = data.signature;
     sigPreview.innerHTML = data.signature;
@@ -309,7 +259,7 @@ document.getElementById('importSignature').addEventListener('click', async () =>
   } else {
     sigStatus.style.display = 'block';
     sigStatus.className = 'status error';
-    sigStatus.textContent = data.error || 'Aucune signature trouvée sur ce compte Gmail.';
+    sigStatus.textContent = data.error || 'Aucune signature trouvée.';
     setTimeout(() => { sigStatus.style.display = 'none'; }, 4000);
   }
 });
@@ -317,19 +267,11 @@ document.getElementById('importSignature').addEventListener('click', async () =>
 document.getElementById('saveSignature').addEventListener('click', async () => {
   const res = await fetch('/api/config/signature', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(session),
     body: JSON.stringify({ signature: sigInput.value })
   });
-
   sigStatus.style.display = 'block';
-  if (res.ok) {
-    sigStatus.className = 'status success';
-    sigStatus.textContent = 'Signature sauvegardée.';
-  } else {
-    sigStatus.className = 'status error';
-    sigStatus.textContent = 'Erreur lors de la sauvegarde.';
-  }
+  sigStatus.className = res.ok ? 'status success' : 'status error';
+  sigStatus.textContent = res.ok ? 'Signature sauvegardée.' : 'Erreur lors de la sauvegarde.';
   setTimeout(() => { sigStatus.style.display = 'none'; }, 3000);
 });
-
-loadSignature();

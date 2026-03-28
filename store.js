@@ -1,11 +1,8 @@
 const { createClient } = require('@supabase/supabase-js');
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
-);
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-// --- Config ---
+// ============ GLOBAL CONFIG (app-wide) ============
 
 async function getConfig() {
   const { data } = await supabase.from('config').select('key, value');
@@ -22,7 +19,24 @@ async function deleteConfigKey(key) {
   await supabase.from('config').delete().eq('key', key);
 }
 
-// --- Templates ---
+// ============ USER CONFIG (per-user Gmail + signature) ============
+
+async function getUserConfig(userId) {
+  const { data } = await supabase.from('user_configs').select('key, value').eq('user_id', userId);
+  const config = {};
+  if (data) data.forEach(row => { config[row.key] = row.value; });
+  return config;
+}
+
+async function setUserConfigKey(userId, key, value) {
+  await supabase.from('user_configs').upsert({ user_id: userId, key, value }, { onConflict: 'user_id,key' });
+}
+
+async function deleteUserConfigKey(userId, key) {
+  await supabase.from('user_configs').delete().eq('user_id', userId).eq('key', key);
+}
+
+// ============ TEMPLATES (shared) ============
 
 function formatTemplate(t) {
   return {
@@ -61,4 +75,9 @@ async function deleteTemplate(id) {
   if (error) throw error;
 }
 
-module.exports = { getConfig, setConfigKey, deleteConfigKey, getTemplates, addTemplate, updateTemplate, deleteTemplate };
+module.exports = {
+  supabase,
+  getConfig, setConfigKey, deleteConfigKey,
+  getUserConfig, setUserConfigKey, deleteUserConfigKey,
+  getTemplates, addTemplate, updateTemplate, deleteTemplate
+};
