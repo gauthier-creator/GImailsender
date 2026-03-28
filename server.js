@@ -1,8 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const { google } = require('googleapis');
-const crypto = require('crypto');
-const { getConfig, saveConfig, getTemplates, saveTemplates } = require('./store');
+const { getConfig, saveConfig, getTemplates, addTemplate, updateTemplate, deleteTemplate } = require('./store');
 
 const app = express();
 app.use(express.json());
@@ -16,8 +15,8 @@ function getAppUrl(req) {
   return `${proto}://${host}`;
 }
 
-function getGmailClient() {
-  const config = getConfig();
+async function getGmailClient() {
+  const config = await getConfig();
   const clientId = config.gmailClientId || process.env.GMAIL_CLIENT_ID;
   const clientSecret = config.gmailClientSecret || process.env.GMAIL_CLIENT_SECRET;
   const refreshToken = config.gmailRefreshToken || process.env.GMAIL_REFRESH_TOKEN;
@@ -29,74 +28,75 @@ function getGmailClient() {
   return google.gmail({ version: 'v1', auth: oauth2Client });
 }
 
-function getSenderEmail() {
-  const config = getConfig();
+async function getSenderEmail() {
+  const config = await getConfig();
   return config.gmailUser || process.env.GMAIL_USER;
 }
 
 // ============ TEMPLATES API ============
 
-app.get('/api/templates', (req, res) => {
-  res.json(getTemplates());
+app.get('/api/templates', async (req, res) => {
+  res.json(await getTemplates());
 });
 
-app.post('/api/templates', (req, res) => {
+app.post('/api/templates', async (req, res) => {
   const { name, subject, body } = req.body;
   if (!name || !subject || !body) {
     return res.status(400).json({ error: 'name, subject et body sont requis.' });
   }
-  const templates = getTemplates();
-  const id = crypto.randomUUID().slice(0, 8);
-  templates.push({ id, name, subject, body });
-  saveTemplates(templates);
-  res.json({ success: true, template: { id, name, subject, body } });
+  try {
+    const template = await addTemplate({ name, subject, body });
+    res.json({ success: true, template });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.put('/api/templates/:id', (req, res) => {
+app.put('/api/templates/:id', async (req, res) => {
   const { name, subject, body } = req.body;
-  const templates = getTemplates();
-  const idx = templates.findIndex(t => t.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'Template introuvable.' });
-  templates[idx] = { ...templates[idx], name, subject, body };
-  saveTemplates(templates);
-  res.json({ success: true, template: templates[idx] });
+  try {
+    const template = await updateTemplate(req.params.id, { name, subject, body });
+    res.json({ success: true, template });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.delete('/api/templates/:id', (req, res) => {
-  let templates = getTemplates();
-  const idx = templates.findIndex(t => t.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'Template introuvable.' });
-  templates.splice(idx, 1);
-  saveTemplates(templates);
-  res.json({ success: true });
+app.delete('/api/templates/:id', async (req, res) => {
+  try {
+    await deleteTemplate(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ============ CONFIG API ============
 
-app.get('/api/config/status', (req, res) => {
-  const config = getConfig();
+app.get('/api/config/status', async (req, res) => {
+  const config = await getConfig();
   const hasCredentials = !!(config.gmailClientId || process.env.GMAIL_CLIENT_ID);
   const hasToken = !!(config.gmailRefreshToken || process.env.GMAIL_REFRESH_TOKEN);
   const gmailUser = config.gmailUser || process.env.GMAIL_USER || '';
   res.json({ connected: hasCredentials && hasToken, gmailUser, hasCredentials, hasToken });
 });
 
-app.post('/api/config/credentials', (req, res) => {
+app.post('/api/config/credentials', async (req, res) => {
   const { gmailClientId, gmailClientSecret, gmailUser } = req.body;
   if (!gmailClientId || !gmailClientSecret || !gmailUser) {
     return res.status(400).json({ error: 'Tous les champs sont requis.' });
   }
-  const config = getConfig();
+  const config = await getConfig();
   config.gmailClientId = gmailClientId;
   config.gmailClientSecret = gmailClientSecret;
   config.gmailUser = gmailUser;
-  saveConfig(config);
+  await saveConfig(config);
   res.json({ success: true });
 });
 
 // Start OAuth flow
-app.get('/api/config/oauth/start', (req, res) => {
-  const config = getConfig();
+app.get('/api/config/oauth/start', async (req, res) => {
+  const config = await getConfig();
   const clientId = config.gmailClientId || process.env.GMAIL_CLIENT_ID;
   const clientSecret = config.gmailClientSecret || process.env.GMAIL_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
@@ -120,7 +120,7 @@ app.get('/api/config/oauth/callback', async (req, res) => {
   const { code } = req.query;
   if (!code) return res.status(400).send('Code manquant.');
 
-  const config = getConfig();
+  const config = await getConfig();
   const clientId = config.gmailClientId || process.env.GMAIL_CLIENT_ID;
   const clientSecret = config.gmailClientSecret || process.env.GMAIL_CLIENT_SECRET;
   const redirectUri = `${getAppUrl(req)}/api/config/oauth/callback`;
@@ -130,7 +130,7 @@ app.get('/api/config/oauth/callback', async (req, res) => {
   try {
     const { tokens } = await oauth2Client.getToken(code);
     config.gmailRefreshToken = tokens.refresh_token;
-    saveConfig(config);
+    await saveConfig(config);
     res.redirect('/config.html?connected=true');
   } catch (err) {
     console.error('OAuth error:', err.message);
@@ -139,10 +139,10 @@ app.get('/api/config/oauth/callback', async (req, res) => {
 });
 
 // Disconnect Gmail
-app.post('/api/config/disconnect', (req, res) => {
-  const config = getConfig();
+app.post('/api/config/disconnect', async (req, res) => {
+  const config = await getConfig();
   delete config.gmailRefreshToken;
-  saveConfig(config);
+  await saveConfig(config);
   res.json({ success: true });
 });
 
@@ -155,20 +155,20 @@ app.post('/api/send', async (req, res) => {
     return res.status(400).json({ error: 'templateId, prenom et email sont requis.' });
   }
 
-  const templates = getTemplates();
+  const templates = await getTemplates();
   const template = templates.find(t => t.id === templateId);
   if (!template) {
     return res.status(404).json({ error: 'Template introuvable.' });
   }
 
-  const gmail = getGmailClient();
+  const gmail = await getGmailClient();
   if (!gmail) {
     return res.status(400).json({ error: 'Gmail non configuré. Va dans Configuration.' });
   }
 
   const subject = template.subject.replace(/\{\{prenom\}\}/g, prenom);
   const htmlBody = template.body.replace(/\{\{prenom\}\}/g, prenom);
-  const senderEmail = getSenderEmail();
+  const senderEmail = await getSenderEmail();
   const raw = createRawEmail(senderEmail, email, subject, htmlBody);
 
   try {
