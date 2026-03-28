@@ -116,14 +116,20 @@
             <textarea id="tplBody" rows="14" placeholder="Bonjour {{prenom}},&#10;&#10;Suite à notre échange..."></textarea>
           </div>
           <div style="border-top:1px solid #2a2a2a;margin:20px 0;"></div>
-          <h3 style="margin-bottom:12px;">Pièce jointe par défaut <span class="hint" style="font-size:12px;">(optionnel)</span></h3>
-          <div class="field">
-            <label for="tplAttachmentName">Nom du fichier</label>
-            <input type="text" id="tplAttachmentName" placeholder="Brochure George V.pdf">
-          </div>
-          <div class="field">
-            <label for="tplAttachmentUrl">URL de téléchargement direct</label>
-            <input type="url" id="tplAttachmentUrl" placeholder="https://...">
+          <h3 style="margin-bottom:6px;">Pièce jointe par défaut <span class="hint" style="font-size:12px;">(optionnel)</span></h3>
+          <p class="help-text" style="margin-bottom:14px;">Le PDF sera stocké sur Supabase et joint automatiquement à chaque envoi.</p>
+          <div class="attachment-upload-zone" id="attachmentZone">
+            <div id="attachmentCurrent" style="display:none;">
+              <span class="attachment-filename" id="attachmentFilename"></span>
+              <button type="button" class="attachment-remove" id="removeAttachment">✕</button>
+            </div>
+            <div id="attachmentEmpty">
+              <input type="file" id="tplAttachmentFile" accept=".pdf,.doc,.docx" style="display:none;">
+              <button type="button" class="btn btn-ghost btn-small" id="pickAttachment">📎 Choisir un fichier PDF</button>
+            </div>
+            <div id="attachmentUploading" style="display:none;">
+              <span style="color:#666;font-size:13px;">Upload en cours...</span>
+            </div>
           </div>
           <div class="modal-actions">
             <button id="cancelTemplate" class="btn btn-ghost">Annuler</button>

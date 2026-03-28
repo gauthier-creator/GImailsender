@@ -298,6 +298,40 @@ textarea:focus {
   margin-top: 20px;
 }
 
+/* Attachment upload zone */
+.attachment-upload-zone {
+  background: #111;
+  border: 1px dashed #333;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.attachment-filename {
+  color: #e0e0e0;
+  font-size: 14px;
+  flex: 1;
+}
+
+.attachment-remove {
+  background: none;
+  border: 1px solid #555;
+  color: #999;
+  width: auto;
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.attachment-remove:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
 /* Signature preview */
 .sig-preview {
   background: #fff;

@@ -134,8 +134,21 @@ function clearModal() {
   document.getElementById('tplName').value = '';
   document.getElementById('tplSubject').value = '';
   document.getElementById('tplBody').value = '';
-  document.getElementById('tplAttachmentName').value = '';
-  document.getElementById('tplAttachmentUrl').value = '';
+  setAttachmentUI(null, null);
+}
+
+function setAttachmentUI(name, url) {
+  const current = document.getElementById('attachmentCurrent');
+  const empty = document.getElementById('attachmentEmpty');
+  const filename = document.getElementById('attachmentFilename');
+  if (name && url) {
+    filename.textContent = '📎 ' + name;
+    current.style.display = 'flex';
+    empty.style.display = 'none';
+  } else {
+    current.style.display = 'none';
+    empty.style.display = 'block';
+  }
 }
 
 document.getElementById('addTemplate').addEventListener('click', () => {
@@ -168,8 +181,7 @@ window.editTemplate = async function(id) {
   document.getElementById('tplName').value = t.name;
   document.getElementById('tplSubject').value = t.subject;
   document.getElementById('tplBody').value = t.body;
-  document.getElementById('tplAttachmentName').value = t.attachment_name || '';
-  document.getElementById('tplAttachmentUrl').value = t.attachment_url || '';
+  setAttachmentUI(t.attachment_name, t.attachment_url);
   modal.style.display = 'flex';
 };
 
@@ -189,9 +201,7 @@ document.getElementById('saveTemplate').addEventListener('click', async () => {
     return;
   }
 
-  const attachment_name = document.getElementById('tplAttachmentName').value.trim() || null;
-  const attachment_url = document.getElementById('tplAttachmentUrl').value.trim() || null;
-  const payload = { name, subject, body, attachment_name, attachment_url };
+  const payload = { name, subject, body };
 
   if (editingTemplateId) {
     await fetch(`/api/templates/${editingTemplateId}`, {
@@ -208,6 +218,48 @@ document.getElementById('saveTemplate').addEventListener('click', async () => {
   }
 
   modal.style.display = 'none';
+  loadTemplates();
+});
+
+// Attachment upload handlers
+document.getElementById('pickAttachment').addEventListener('click', () => {
+  document.getElementById('tplAttachmentFile').click();
+});
+
+document.getElementById('tplAttachmentFile').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file || !editingTemplateId) return;
+
+  const uploading = document.getElementById('attachmentUploading');
+  const empty = document.getElementById('attachmentEmpty');
+  uploading.style.display = 'block';
+  empty.style.display = 'none';
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const res = await fetch(`/api/templates/${editingTemplateId}/attachment`, {
+    method: 'POST',
+    body: formData
+  });
+  const data = await res.json();
+  uploading.style.display = 'none';
+
+  if (res.ok) {
+    setAttachmentUI(data.attachment_name, data.attachment_url);
+    loadTemplates();
+  } else {
+    empty.style.display = 'block';
+    alert('Erreur upload : ' + data.error);
+  }
+  e.target.value = '';
+});
+
+document.getElementById('removeAttachment').addEventListener('click', async () => {
+  if (!editingTemplateId) return;
+  if (!confirm('Supprimer la pièce jointe ?')) return;
+  await fetch(`/api/templates/${editingTemplateId}/attachment`, { method: 'DELETE' });
+  setAttachmentUI(null, null);
   loadTemplates();
 });
 

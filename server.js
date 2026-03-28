@@ -1,7 +1,11 @@
 require('dotenv').config();
 const express = require('express');
 const { google } = require('googleapis');
+const multer = require('multer');
+const { createClient } = require('@supabase/supabase-js');
 const { getConfig, setConfigKey, deleteConfigKey, getTemplates, addTemplate, updateTemplate, deleteTemplate } = require('./store');
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 const app = express();
 app.use(express.json());
@@ -71,6 +75,49 @@ app.delete('/api/templates/:id', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// Upload attachment to Supabase Storage
+app.post('/api/templates/:id/attachment', upload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Aucun fichier reçu.' });
+
+  const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+  const path = `${req.params.id}/${req.file.originalname}`;
+
+  // Remove old file if exists
+  await supabase.storage.from('attachments').remove([path]);
+
+  const { error } = await supabase.storage.from('attachments').upload(path, req.file.buffer, {
+    contentType: req.file.mimetype,
+    upsert: true
+  });
+  if (error) return res.status(500).json({ error: error.message });
+
+  const { data: { publicUrl } } = supabase.storage.from('attachments').getPublicUrl(path);
+
+  await updateTemplate(req.params.id, {
+    ...(await getTemplates()).find(t => t.id === req.params.id),
+    attachment_url: publicUrl,
+    attachment_name: req.file.originalname
+  });
+
+  res.json({ success: true, attachment_url: publicUrl, attachment_name: req.file.originalname });
+});
+
+// Remove attachment from template
+app.delete('/api/templates/:id/attachment', async (req, res) => {
+  const templates = await getTemplates();
+  const template = templates.find(t => t.id === req.params.id);
+  if (!template) return res.status(404).json({ error: 'Template introuvable.' });
+
+  if (template.attachment_url) {
+    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+    const path = `${req.params.id}/${template.attachment_name}`;
+    await supabase.storage.from('attachments').remove([path]);
+  }
+
+  await updateTemplate(req.params.id, { ...template, attachment_url: null, attachment_name: null });
+  res.json({ success: true });
 });
 
 // ============ CONFIG API ============
