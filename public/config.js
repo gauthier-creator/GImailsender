@@ -228,17 +228,23 @@ document.getElementById('tplAttachmentFile').addEventListener('change', async (e
   const empty = document.getElementById('attachmentEmpty');
   uploading.style.display = 'block';
   empty.style.display = 'none';
-  const formData = new FormData();
-  formData.append('file', file);
-  const res = await fetch(`/api/templates/${editingTemplateId}/attachment`, {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${session.access_token}` },
-    body: formData
-  });
-  const data = await res.json();
-  uploading.style.display = 'none';
-  if (res.ok) { setAttachmentUI(data.attachment_name, data.attachment_url); loadTemplates(); }
-  else { empty.style.display = 'block'; alert('Erreur upload : ' + data.error); }
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(`/api/templates/${editingTemplateId}/attachment`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${session.access_token}` },
+      body: formData
+    });
+    const data = await res.json();
+    uploading.style.display = 'none';
+    if (res.ok) { setAttachmentUI(data.attachment_name, data.attachment_url); loadTemplates(); }
+    else { empty.style.display = 'block'; alert('Erreur upload : ' + data.error); }
+  } catch (err) {
+    uploading.style.display = 'none';
+    empty.style.display = 'block';
+    alert('Erreur réseau lors de l\'upload : ' + err.message);
+  }
   e.target.value = '';
 });
 

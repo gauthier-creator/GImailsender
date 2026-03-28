@@ -121,18 +121,41 @@ app.delete('/api/templates/:id', requireAuth, async (req, res) => {
 
 // Upload attachment
 app.post('/api/templates/:id/attachment', requireAuth, upload.single('file'), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'Aucun fichier reçu.' });
-  const path = `${req.params.id}/${req.file.originalname}`;
-  await supabase.storage.from('attachments').remove([path]);
-  const { error } = await supabase.storage.from('attachments').upload(path, req.file.buffer, { contentType: req.file.mimetype, upsert: true });
-  if (error) return res.status(500).json({ error: error.message });
-  const { data: { publicUrl } } = supabase.storage.from('attachments').getPublicUrl(path);
-  await updateTemplate(req.params.id, {
-    ...(await getTemplates()).find(t => t.id === req.params.id),
-    attachment_url: publicUrl,
-    attachment_name: req.file.originalname
-  });
-  res.json({ success: true, attachment_url: publicUrl, attachment_name: req.file.originalname });
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Aucun fichier reçu.' });
+
+    const templates = await getTemplates();
+    const template = templates.find(t => t.id === req.params.id);
+    if (!template) return res.status(404).json({ error: 'Template introuvable.' });
+
+    const filePath = `${req.params.id}/${req.file.originalname}`;
+
+    // Supprimer l'ancien fichier s'il existe (ignore les erreurs)
+    await supabase.storage.from('attachments').remove([filePath]).catch(() => {});
+
+    const { error: uploadError } = await supabase.storage
+      .from('attachments')
+      .upload(filePath, req.file.buffer, { contentType: req.file.mimetype, upsert: true });
+
+    if (uploadError) return res.status(500).json({ error: `Erreur Supabase Storage : ${uploadError.message}` });
+
+    const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(filePath);
+    const publicUrl = urlData?.publicUrl;
+    if (!publicUrl) return res.status(500).json({ error: 'Impossible de récupérer l\'URL publique.' });
+
+    await updateTemplate(req.params.id, {
+      name: template.name,
+      subject: template.subject,
+      body: template.body,
+      attachment_url: publicUrl,
+      attachment_name: req.file.originalname
+    });
+
+    res.json({ success: true, attachment_url: publicUrl, attachment_name: req.file.originalname });
+  } catch (err) {
+    console.error('Upload attachment error:', err.message);
+    res.status(500).json({ error: `Erreur serveur : ${err.message}` });
+  }
 });
 
 app.delete('/api/templates/:id/attachment', requireAuth, async (req, res) => {
