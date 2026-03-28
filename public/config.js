@@ -85,6 +85,7 @@ document.getElementById('disconnectGmail').addEventListener('click', async () =>
 
 // --- Templates ---
 let editingTemplateId = null;
+let pendingAttachmentFile = null;
 
 async function loadTemplates() {
   const res = await fetch('/api/templates', { headers: authHeaders(session) });
@@ -121,6 +122,7 @@ function clearModal() {
   document.getElementById('tplName').value = '';
   document.getElementById('tplSubject').value = '';
   document.getElementById('tplBody').value = '';
+  pendingAttachmentFile = null;
   setAttachmentUI(null, null);
 }
 
@@ -175,15 +177,32 @@ document.getElementById('saveTemplate').addEventListener('click', async () => {
   const body = document.getElementById('tplBody').value;
   if (!name || !subject || !body) { alert('Remplis tous les champs.'); return; }
   const payload = { name, subject, body };
+
+  let templateId = editingTemplateId;
   if (editingTemplateId) {
     await fetch(`/api/templates/${editingTemplateId}`, {
       method: 'PUT', headers: authHeaders(session), body: JSON.stringify(payload)
     });
   } else {
-    await fetch('/api/templates', {
+    const res = await fetch('/api/templates', {
       method: 'POST', headers: authHeaders(session), body: JSON.stringify(payload)
     });
+    const data = await res.json();
+    templateId = data.template?.id;
   }
+
+  // Upload la PJ en attente si l'utilisateur en avait choisi une
+  if (pendingAttachmentFile && templateId) {
+    const formData = new FormData();
+    formData.append('file', pendingAttachmentFile);
+    await fetch(`/api/templates/${templateId}/attachment`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${session.access_token}` },
+      body: formData
+    });
+    pendingAttachmentFile = null;
+  }
+
   modal.style.display = 'none';
   loadTemplates();
 });
@@ -194,7 +213,17 @@ document.getElementById('pickAttachment').addEventListener('click', () => {
 
 document.getElementById('tplAttachmentFile').addEventListener('change', async (e) => {
   const file = e.target.files[0];
-  if (!file || !editingTemplateId) return;
+  if (!file) return;
+
+  // Nouveau template : on garde le fichier en mémoire, upload après sauvegarde
+  if (!editingTemplateId) {
+    pendingAttachmentFile = file;
+    setAttachmentUI(file.name, 'pending');
+    e.target.value = '';
+    return;
+  }
+
+  // Template existant : upload immédiat
   const uploading = document.getElementById('attachmentUploading');
   const empty = document.getElementById('attachmentEmpty');
   uploading.style.display = 'block';
@@ -214,7 +243,13 @@ document.getElementById('tplAttachmentFile').addEventListener('change', async (e
 });
 
 document.getElementById('removeAttachment').addEventListener('click', async () => {
-  if (!editingTemplateId || !confirm('Supprimer la pièce jointe ?')) return;
+  if (!confirm('Supprimer la pièce jointe ?')) return;
+  // Fichier en attente (nouveau template pas encore sauvegardé)
+  if (!editingTemplateId) {
+    pendingAttachmentFile = null;
+    setAttachmentUI(null, null);
+    return;
+  }
   await fetch(`/api/templates/${editingTemplateId}/attachment`, {
     method: 'DELETE', headers: authHeaders(session)
   });
