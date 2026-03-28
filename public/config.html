@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GMailSender — Configuration</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="config.css">
+</head>
+<body>
+  <div class="container config-container">
+    <div class="header">
+      <div>
+        <h1>Configuration</h1>
+        <p class="subtitle">Connecte ton Gmail et gère tes templates</p>
+      </div>
+      <a href="/" class="back-link">← Retour</a>
+    </div>
+
+    <!-- TABS -->
+    <div class="tabs">
+      <button class="tab active" data-tab="gmail">Gmail API</button>
+      <button class="tab" data-tab="templates">Templates</button>
+    </div>
+
+    <!-- GMAIL TAB -->
+    <div class="tab-content active" id="tab-gmail">
+      <div class="status-card" id="gmailStatus">
+        <div class="status-dot"></div>
+        <span class="status-text">Vérification...</span>
+      </div>
+
+      <div id="credentialsForm">
+        <h3>1. Credentials Google Cloud</h3>
+        <p class="help-text">Crée un OAuth Client ID sur <a href="https://console.cloud.google.com/apis/credentials" target="_blank">Google Cloud Console</a> (type : Web application). Ajoute comme URI de redirection autorisée : <code id="redirectUri"></code></p>
+
+        <div class="field">
+          <label for="clientId">Client ID</label>
+          <input type="text" id="clientId" placeholder="xxxx.apps.googleusercontent.com">
+        </div>
+        <div class="field">
+          <label for="clientSecret">Client Secret</label>
+          <input type="password" id="clientSecret" placeholder="GOCSPX-xxxx">
+        </div>
+        <div class="field">
+          <label for="gmailUser">Ton adresse Gmail</label>
+          <input type="email" id="gmailUser" placeholder="ton-email@gmail.com">
+        </div>
+        <button id="saveCredentials" class="btn">Sauvegarder</button>
+      </div>
+
+      <div id="connectSection" style="display:none;">
+        <h3>2. Connecter Gmail</h3>
+        <button id="connectGmail" class="btn btn-green">Connecter mon compte Gmail</button>
+      </div>
+
+      <div id="disconnectSection" style="display:none;">
+        <button id="disconnectGmail" class="btn btn-red">Déconnecter Gmail</button>
+      </div>
+    </div>
+
+    <!-- TEMPLATES TAB -->
+    <div class="tab-content" id="tab-templates">
+      <div class="templates-header">
+        <h3>Mes templates</h3>
+        <button id="addTemplate" class="btn btn-small">+ Nouveau</button>
+      </div>
+
+      <div id="templatesList"></div>
+
+      <!-- Template Editor Modal -->
+      <div class="modal" id="templateModal" style="display:none;">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3 id="modalTitle">Nouveau template</h3>
+            <button class="modal-close" id="closeModal">✕</button>
+          </div>
+          <div class="field">
+            <label for="tplName">Nom du template</label>
+            <input type="text" id="tplName" placeholder="Ex: Suivi appel — Projet X">
+          </div>
+          <div class="field">
+            <label for="tplSubject">Objet du mail</label>
+            <input type="text" id="tplSubject" placeholder="Suite à notre échange — {{prenom}}">
+          </div>
+          <div class="field">
+            <label for="tplBody">Corps du mail <span class="hint">Utilise {{prenom}} pour le prénom. HTML supporté.</span></label>
+            <textarea id="tplBody" rows="14" placeholder="Bonjour {{prenom}},&#10;&#10;Suite à notre échange..."></textarea>
+          </div>
+          <div class="modal-actions">
+            <button id="cancelTemplate" class="btn btn-ghost">Annuler</button>
+            <button id="saveTemplate" class="btn">Sauvegarder</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+</body>
+</html>
