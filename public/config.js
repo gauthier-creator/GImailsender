@@ -201,3 +201,49 @@ document.getElementById('saveTemplate').addEventListener('click', async () => {
 });
 
 loadTemplates();
+
+// --- Signature ---
+const sigInput = document.getElementById('sigInput');
+const sigPreviewSection = document.getElementById('sigPreviewSection');
+const sigPreview = document.getElementById('sigPreview');
+const sigStatus = document.getElementById('sigStatus');
+
+async function loadSignature() {
+  const res = await fetch('/api/config/signature');
+  const data = await res.json();
+  if (data.signature) {
+    sigInput.value = data.signature;
+    sigPreview.innerHTML = data.signature;
+    sigPreviewSection.style.display = 'block';
+  }
+}
+
+sigInput.addEventListener('input', () => {
+  const val = sigInput.value.trim();
+  if (val) {
+    sigPreview.innerHTML = val;
+    sigPreviewSection.style.display = 'block';
+  } else {
+    sigPreviewSection.style.display = 'none';
+  }
+});
+
+document.getElementById('saveSignature').addEventListener('click', async () => {
+  const res = await fetch('/api/config/signature', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ signature: sigInput.value })
+  });
+
+  sigStatus.style.display = 'block';
+  if (res.ok) {
+    sigStatus.className = 'status success';
+    sigStatus.textContent = 'Signature sauvegardée.';
+  } else {
+    sigStatus.className = 'status error';
+    sigStatus.textContent = 'Erreur lors de la sauvegarde.';
+  }
+  setTimeout(() => { sigStatus.style.display = 'none'; }, 3000);
+});
+
+loadSignature();

@@ -20,6 +20,7 @@
     <!-- TABS -->
     <div class="tabs">
       <button class="tab active" data-tab="gmail">Gmail API</button>
+      <button class="tab" data-tab="signature">Signature</button>
       <button class="tab" data-tab="templates">Templates</button>
     </div>
 
@@ -57,6 +58,26 @@
       <div id="disconnectSection" style="display:none;">
         <button id="disconnectGmail" class="btn btn-red">Déconnecter Gmail</button>
       </div>
+    </div>
+
+    <!-- SIGNATURE TAB -->
+    <div class="tab-content" id="tab-signature">
+      <h3>Ma signature</h3>
+      <p class="help-text">Elle sera ajoutée automatiquement en bas de chaque email. HTML supporté (gras, liens, couleurs...).</p>
+
+      <div class="field">
+        <label for="sigInput">Signature <span class="hint">HTML supporté</span></label>
+        <textarea id="sigInput" rows="10" placeholder="-- &#10;&#10;Ton Prénom NOM&#10;Ton titre, Ton entreprise&#10;&#10;+33 6 XX XX XX XX | ton-site.com&#10;ton-email@exemple.com"></textarea>
+      </div>
+
+      <button id="saveSignature" class="btn">Sauvegarder</button>
+
+      <div id="sigPreviewSection" style="display:none; margin-top:24px;">
+        <h3>Aperçu</h3>
+        <div class="sig-preview" id="sigPreview"></div>
+      </div>
+
+      <div id="sigStatus" class="status" style="display:none; margin-top:12px;"></div>
     </div>
 
     <!-- TEMPLATES TAB -->

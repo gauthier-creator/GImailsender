@@ -76,6 +76,19 @@ app.delete('/api/templates/:id', async (req, res) => {
 
 // ============ CONFIG API ============
 
+app.get('/api/config/signature', async (req, res) => {
+  const config = await getConfig();
+  res.json({ signature: config.gmailSignature || '' });
+});
+
+app.post('/api/config/signature', async (req, res) => {
+  const { signature } = req.body;
+  const config = await getConfig();
+  config.gmailSignature = signature || '';
+  await saveConfig(config);
+  res.json({ success: true });
+});
+
 app.get('/api/config/status', async (req, res) => {
   const config = await getConfig();
   const hasCredentials = !!(config.gmailClientId || process.env.GMAIL_CLIENT_ID);
@@ -169,8 +182,13 @@ app.post('/api/send', upload.single('attachment'), async (req, res) => {
     return res.status(400).json({ error: 'Gmail non configuré. Va dans Configuration.' });
   }
 
+  const config = await getConfig();
+  const signature = config.gmailSignature || '';
   const subject = template.subject.replace(/\{\{prenom\}\}/g, prenom);
-  const htmlBody = template.body.replace(/\{\{prenom\}\}/g, prenom);
+  const bodyContent = template.body.replace(/\{\{prenom\}\}/g, prenom);
+  const htmlBody = signature
+    ? `${bodyContent}<br><br><hr style="border:none;border-top:1px solid #e0e0e0;margin:16px 0;">${signature}`
+    : bodyContent;
   const senderEmail = await getSenderEmail();
   const raw = createRawEmail(senderEmail, email, subject, htmlBody, req.file || null);
 

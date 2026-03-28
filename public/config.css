@@ -297,3 +297,14 @@ textarea:focus {
 #connectSection, #disconnectSection {
   margin-top: 20px;
 }
+
+/* Signature preview */
+.sig-preview {
+  background: #fff;
+  color: #222;
+  padding: 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.6;
+  font-family: Arial, sans-serif;
+}
