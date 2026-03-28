@@ -245,20 +245,29 @@ app.get('/api/config/signature/import', requireAuth, async (req, res) => {
 // ============ SEND EMAIL ============
 
 app.post('/api/send', requireAuth, async (req, res) => {
-  const { templateId, prenom, email } = req.body;
+  const { templateId, prenom, email, date_rdv } = req.body;
   if (!templateId || !prenom || !email) return res.status(400).json({ error: 'templateId, prenom et email sont requis.' });
 
   const templates = await getTemplates();
   const template = templates.find(t => t.id === templateId);
   if (!template) return res.status(404).json({ error: 'Template introuvable.' });
 
+  // Vérifier que les variables requises sont bien fournies
+  if ((template.body?.includes('{{date_rdv}}') || template.subject?.includes('{{date_rdv}}')) && !date_rdv) {
+    return res.status(400).json({ error: 'La date du RDV est requise pour ce template.' });
+  }
+
   const gmail = await getGmailClient(req.user.id);
   if (!gmail) return res.status(400).json({ error: 'Gmail non configuré. Va dans Configuration.' });
 
   const config = await getUserConfig(req.user.id);
   const signature = config.gmailSignature || '';
-  const subject = template.subject.replace(/\{\{prenom\}\}/g, prenom);
-  const bodyContent = template.body.replace(/\{\{prenom\}\}/g, prenom);
+  const subject = template.subject
+    .replace(/\{\{prenom\}\}/g, prenom)
+    .replace(/\{\{date_rdv\}\}/g, date_rdv || '');
+  const bodyContent = template.body
+    .replace(/\{\{prenom\}\}/g, prenom)
+    .replace(/\{\{date_rdv\}\}/g, date_rdv || '');
   const htmlBody = signature
     ? `${bodyContent}<br><br><hr style="border:none;border-top:1px solid #e0e0e0;margin:16px 0;">${signature}`
     : bodyContent;

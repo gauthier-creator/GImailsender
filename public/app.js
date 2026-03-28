@@ -4,6 +4,8 @@ let session;
 const templateSelect = document.getElementById('template');
 const prenomInput = document.getElementById('prenom');
 const emailInput = document.getElementById('email');
+const dateRdvField = document.getElementById('dateRdvField');
+const dateRdvInput = document.getElementById('dateRdv');
 const attachmentInfo = document.getElementById('attachmentInfo');
 const attachmentLabel = document.getElementById('attachmentLabel');
 const sendBtn = document.getElementById('sendBtn');
@@ -33,17 +35,23 @@ async function loadTemplates() {
   });
 }
 
-function updateAttachmentInfo() {
+function updateTemplateFields() {
   const t = templates.find(t => t.id === templateSelect.value);
+  // Attachment
   if (t && t.attachment_url && t.attachment_name) {
     attachmentLabel.textContent = `📎 ${t.attachment_name}`;
     attachmentInfo.style.display = 'block';
   } else {
     attachmentInfo.style.display = 'none';
   }
+  // Date RDV field — visible seulement si le template contient {{date_rdv}}
+  const needsDate = t && (t.body?.includes('{{date_rdv}}') || t.subject?.includes('{{date_rdv}}'));
+  dateRdvField.style.display = needsDate ? 'block' : 'none';
+  dateRdvInput.required = !!needsDate;
+  if (!needsDate) dateRdvInput.value = '';
 }
 
-templateSelect.addEventListener('change', updateAttachmentInfo);
+templateSelect.addEventListener('change', updateTemplateFields);
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -58,7 +66,8 @@ form.addEventListener('submit', async (e) => {
       body: JSON.stringify({
         templateId: templateSelect.value,
         prenom: prenomInput.value,
-        email: emailInput.value
+        email: emailInput.value,
+        date_rdv: dateRdvInput.value || undefined
       })
     });
     const data = await res.json();
@@ -67,6 +76,7 @@ form.addEventListener('submit', async (e) => {
       statusDiv.textContent = data.message;
       emailInput.value = '';
       prenomInput.value = '';
+      dateRdvInput.value = '';
     } else {
       statusDiv.className = 'status error';
       statusDiv.textContent = data.error;
