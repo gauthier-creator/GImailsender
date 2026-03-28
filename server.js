@@ -6,7 +6,7 @@ const { getConfig, saveConfig, getTemplates, addTemplate, updateTemplate, delete
 
 const app = express();
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static('public', { etag: false, maxAge: 0 }));
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
