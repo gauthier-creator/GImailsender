@@ -25,7 +25,7 @@ if (params.get('connected') === 'true') {
   history.replaceState(null, '', '/config.html');
 }
 if (params.get('error')) {
-  alert('Erreur lors de la connexion OAuth. Réessaie.');
+  alert(`Erreur OAuth : ${decodeURIComponent(params.get('error'))}`);
   history.replaceState(null, '', '/config.html');
 }
 
