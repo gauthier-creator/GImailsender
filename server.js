@@ -360,4 +360,10 @@ function createRawEmail(from, to, subject, htmlBody, file) {
   return Buffer.from(message).toString('base64url');
 }
 
+// Global error handler — converts all Express/multer errors to JSON (never HTML)
+app.use((err, req, res, next) => {
+  console.error('Express error:', err.message);
+  res.status(err.status || 500).json({ error: err.message || 'Erreur serveur' });
+});
+
 app.listen(PORT, () => console.log(`GMailSender running on http://localhost:${PORT}`));
