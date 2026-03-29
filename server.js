@@ -274,6 +274,62 @@ app.get('/api/config/signature/import', requireAuth, async (req, res) => {
   }
 });
 
+// ============ STATS ============
+
+app.get('/api/stats', requireAuth, async (req, res) => {
+  const isAdmin = req.user.user_metadata?.is_admin;
+  const now = new Date();
+  const startOfDay   = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+  const startOfWeek  = new Date(now - (now.getDay() || 7) * 86400000).toISOString();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+  // Scope : admin voit tout, user voit seulement ses envois
+  let query = supabase.from('email_logs').select('*').order('sent_at', { ascending: false });
+  if (!isAdmin) query = query.eq('user_id', req.user.id);
+
+  const { data: logs, error } = await query;
+  if (error) return res.status(500).json({ error: error.message });
+
+  const total  = logs.length;
+  const today  = logs.filter(l => l.sent_at >= startOfDay).length;
+  const week   = logs.filter(l => l.sent_at >= startOfWeek).length;
+  const month  = logs.filter(l => l.sent_at >= startOfMonth).length;
+
+  // Par template
+  const byTemplate = {};
+  logs.forEach(l => {
+    const key = l.template_name || 'Inconnu';
+    byTemplate[key] = (byTemplate[key] || 0) + 1;
+  });
+
+  // Par utilisateur (admin seulement)
+  const byUser = {};
+  if (isAdmin) {
+    logs.forEach(l => {
+      const key = l.user_email || 'Inconnu';
+      byUser[key] = (byUser[key] || 0) + 1;
+    });
+  }
+
+  // Par jour (30 derniers jours)
+  const byDay = {};
+  const thirtyDaysAgo = new Date(now - 30 * 86400000);
+  logs.filter(l => new Date(l.sent_at) >= thirtyDaysAgo).forEach(l => {
+    const day = l.sent_at.slice(0, 10);
+    byDay[day] = (byDay[day] || 0) + 1;
+  });
+
+  // Derniers envois
+  const recent = logs.slice(0, 20).map(l => ({
+    user_email: l.user_email,
+    template_name: l.template_name,
+    recipient_email: l.recipient_email,
+    sent_at: l.sent_at
+  }));
+
+  res.json({ total, today, week, month, byTemplate, byUser, byDay, recent, isAdmin });
+});
+
 // ============ SEND EMAIL ============
 
 app.post('/api/send', requireAuth, async (req, res) => {
@@ -328,6 +384,14 @@ app.post('/api/send', requireAuth, async (req, res) => {
   const raw = createRawEmail(senderHeader, email, subject, htmlBody, attachmentFile);
   try {
     await gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
+    // Log l'envoi pour les stats
+    await supabase.from('email_logs').insert({
+      user_id: req.user.id,
+      user_email: req.user.email,
+      template_id: template.id,
+      template_name: template.name,
+      recipient_email: email
+    });
     res.json({ success: true, message: `Email envoyé à ${email}` });
   } catch (err) {
     console.error('Erreur envoi Gmail:', err.message);
