@@ -193,13 +193,19 @@ document.getElementById('saveTemplate').addEventListener('click', async () => {
 
   // Upload la PJ en attente si l'utilisateur en avait choisi une
   if (pendingAttachmentFile && templateId) {
-    const formData = new FormData();
-    formData.append('file', pendingAttachmentFile);
-    await fetch(`/api/templates/${templateId}/attachment`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${session.access_token}` },
-      body: formData
-    });
+    try {
+      const formData = new FormData();
+      formData.append('file', pendingAttachmentFile);
+      const upRes = await fetch(`/api/templates/${templateId}/attachment`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+        body: formData
+      });
+      const upData = await upRes.json();
+      if (!upRes.ok) alert('Pièce jointe non enregistrée : ' + upData.error);
+    } catch (err) {
+      alert('Erreur upload pièce jointe : ' + err.message);
+    }
     pendingAttachmentFile = null;
   }
 

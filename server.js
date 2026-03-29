@@ -51,6 +51,17 @@ app.get('/api/public-config', (req, res) => {
   });
 });
 
+// Endpoint de diagnostic storage (temporaire)
+app.get('/api/debug/storage', requireAuth, async (req, res) => {
+  const testPath = `debug/test_${Date.now()}.txt`;
+  const { error } = await supabase.storage
+    .from('attachments')
+    .upload(testPath, Buffer.from('test'), { contentType: 'text/plain', upsert: true });
+  if (error) return res.json({ ok: false, error: error.message, hint: 'Vérifier SUPABASE_KEY sur Railway' });
+  await supabase.storage.from('attachments').remove([testPath]);
+  res.json({ ok: true, message: 'Storage fonctionne correctement' });
+});
+
 function getAppUrl(req) {
   const proto = req.headers['x-forwarded-proto'] || req.protocol;
   const host = req.headers['x-forwarded-host'] || req.headers.host;
