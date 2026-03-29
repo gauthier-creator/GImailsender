@@ -139,7 +139,10 @@ app.post('/api/templates/:id/attachment', requireAuth, upload.single('file'), as
     const template = templates.find(t => t.id === req.params.id);
     if (!template) return res.status(404).json({ error: 'Template introuvable.' });
 
-    const filePath = `${req.params.id}/${req.file.originalname}`;
+    const safeName = req.file.originalname
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // supprime les accents
+      .replace(/[^a-zA-Z0-9._-]/g, '_');                 // remplace tout caractère spécial par _
+    const filePath = `${req.params.id}/${safeName}`;
 
     // Supprimer l'ancien fichier s'il existe (ignore les erreurs)
     await supabase.storage.from('attachments').remove([filePath]).catch(() => {});
@@ -159,7 +162,7 @@ app.post('/api/templates/:id/attachment', requireAuth, upload.single('file'), as
       subject: template.subject,
       body: template.body,
       attachment_url: publicUrl,
-      attachment_name: req.file.originalname
+      attachment_name: req.file.originalname  // on garde le vrai nom pour l'affichage
     });
 
     res.json({ success: true, attachment_url: publicUrl, attachment_name: req.file.originalname });
