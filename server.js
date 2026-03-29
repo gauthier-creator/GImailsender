@@ -6,7 +6,8 @@ const { createClient } = require('@supabase/supabase-js');
 const {
   supabase,
   getUserConfig, setUserConfigKey, deleteUserConfigKey,
-  getTemplates, addTemplate, updateTemplate, deleteTemplate
+  getTemplates, addTemplate, updateTemplate, deleteTemplate,
+  setTemplateAttachment, clearTemplateAttachment
 } = require('./store');
 
 const app = express();
@@ -157,13 +158,7 @@ app.post('/api/templates/:id/attachment', requireAuth, upload.single('file'), as
     const publicUrl = urlData?.publicUrl;
     if (!publicUrl) return res.status(500).json({ error: 'Impossible de récupérer l\'URL publique.' });
 
-    await updateTemplate(req.params.id, {
-      name: template.name,
-      subject: template.subject,
-      body: template.body,
-      attachment_url: publicUrl,
-      attachment_name: req.file.originalname  // on garde le vrai nom pour l'affichage
-    });
+    await setTemplateAttachment(req.params.id, publicUrl, req.file.originalname);
 
     res.json({ success: true, attachment_url: publicUrl, attachment_name: req.file.originalname });
   } catch (err) {
@@ -179,7 +174,7 @@ app.delete('/api/templates/:id/attachment', requireAuth, async (req, res) => {
   if (template.attachment_url) {
     await supabase.storage.from('attachments').remove([`${req.params.id}/${template.attachment_name}`]);
   }
-  await updateTemplate(req.params.id, { ...template, attachment_url: null, attachment_name: null });
+  await clearTemplateAttachment(req.params.id);
   res.json({ success: true });
 });
 

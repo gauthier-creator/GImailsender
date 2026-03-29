@@ -70,6 +70,20 @@ async function updateTemplate(id, { name, subject, body, attachment_url, attachm
   return formatTemplate(data);
 }
 
+async function setTemplateAttachment(id, attachment_url, attachment_name) {
+  const { error } = await supabase.from('templates')
+    .update({ attachment_url, attachment_name })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+async function clearTemplateAttachment(id) {
+  const { error } = await supabase.from('templates')
+    .update({ attachment_url: null, attachment_name: null })
+    .eq('id', id);
+  if (error) throw error;
+}
+
 async function deleteTemplate(id) {
   const { error } = await supabase.from('templates').delete().eq('id', id);
   if (error) throw error;
@@ -79,5 +93,6 @@ module.exports = {
   supabase,
   getConfig, setConfigKey, deleteConfigKey,
   getUserConfig, setUserConfigKey, deleteUserConfigKey,
-  getTemplates, addTemplate, updateTemplate, deleteTemplate
+  getTemplates, addTemplate, updateTemplate, deleteTemplate,
+  setTemplateAttachment, clearTemplateAttachment
 };
