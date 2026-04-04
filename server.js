@@ -415,14 +415,17 @@ app.get('/api/scan-no-reply', requireAuth, async (req, res) => {
   const config = await getUserConfig(req.user.id);
   const senderEmail = config.gmailUser || '';
 
-  const days = Math.min(Math.max(parseInt(req.query.days) || 7, 1), 90);
-  const sevenDaysAgo = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString();
+  const days = Math.min(Math.max(parseInt(req.query.days ?? '7'), 0), 90);
+  // 0 = depuis minuit aujourd'hui
+  const since = days === 0
+    ? new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
+    : new Date(Date.now() - days * 24 * 3600 * 1000).toISOString();
   const { data: logs, error } = await supabase
     .from('email_logs')
     .select('*')
     .eq('user_id', req.user.id)
     .eq('template_id', templateId)
-    .gte('sent_at', sevenDaysAgo)
+    .gte('sent_at', since)
     .not('gmail_thread_id', 'is', null);
 
   if (error) return res.status(500).json({ error: error.message });
