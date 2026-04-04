@@ -54,6 +54,53 @@
     </form>
 
     <div id="status" class="status" style="display:none;"></div>
+
+    <!-- ====== SCAN NO-RÉPONSE ====== -->
+    <div style="margin-top:32px;border-top:1px solid #222;padding-top:24px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <div>
+          <h2 style="margin:0;font-size:16px;font-weight:600;color:#e0e0e0;">Scan no-réponse</h2>
+          <p style="margin:4px 0 0;font-size:12px;color:#555;">Trouve les contacts qui n'ont pas répondu dans les 7 derniers jours et relance-les en un clic.</p>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+        <div class="field" style="margin:0;">
+          <label style="font-size:12px;color:#666;">Template à scanner</label>
+          <select id="scanTemplate">
+            <option value="">Choisir un template...</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0;">
+          <label style="font-size:12px;color:#666;">Template de relance</label>
+          <select id="relanceTemplate">
+            <option value="">Choisir un template...</option>
+          </select>
+        </div>
+      </div>
+
+      <button id="scanBtn" type="button" style="background:#1a1a1a;border:1px solid #333;color:#e0e0e0;width:auto;padding:10px 24px;font-size:13px;border-radius:8px;cursor:pointer;margin-bottom:16px;">
+        🔍 Lancer le scan
+      </button>
+
+      <div id="scanStatus" style="display:none;font-size:13px;color:#666;margin-bottom:12px;"></div>
+
+      <div id="scanResults" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <span id="scanResultsCount" style="font-size:13px;color:#aaa;"></span>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <label style="font-size:12px;color:#555;cursor:pointer;">
+              <input type="checkbox" id="selectAll" style="width:auto;margin-right:4px;"> Tout sélectionner
+            </label>
+            <button id="relanceBtn" type="button" style="background:#4a9eff;border:none;color:#fff;width:auto;padding:8px 20px;font-size:13px;border-radius:8px;cursor:pointer;">
+              Relancer la sélection
+            </button>
+          </div>
+        </div>
+        <div id="scanList" style="display:flex;flex-direction:column;gap:6px;"></div>
+        <div id="relanceStatus" style="display:none;margin-top:12px;font-size:13px;"></div>
+      </div>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>

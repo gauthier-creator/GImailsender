@@ -332,23 +332,8 @@ app.get('/api/stats', requireAuth, async (req, res) => {
 
 // ============ SEND EMAIL ============
 
-app.post('/api/send', requireAuth, async (req, res) => {
-  const { templateId, prenom, email, date_rdv } = req.body;
-  if (!templateId || !prenom || !email) return res.status(400).json({ error: 'templateId, prenom et email sont requis.' });
-
-  const templates = await getTemplates();
-  const template = templates.find(t => t.id === templateId);
-  if (!template) return res.status(404).json({ error: 'Template introuvable.' });
-
-  // Vérifier que les variables requises sont bien fournies
-  if ((template.body?.includes('{{date_rdv}}') || template.subject?.includes('{{date_rdv}}')) && !date_rdv) {
-    return res.status(400).json({ error: 'La date du RDV est requise pour ce template.' });
-  }
-
-  const gmail = await getGmailClient(req.user.id);
-  if (!gmail) return res.status(400).json({ error: 'Gmail non configuré. Va dans Configuration.' });
-
-  const config = await getUserConfig(req.user.id);
+// Fonction centrale d'envoi réutilisée par /api/send et /api/send-bulk
+async function sendEmail({ userId, userEmail, template, gmail, config, recipientEmail, prenom, date_rdv }) {
   const signature = config.gmailSignature || '';
   const subject = template.subject
     .replace(/\{\{prenom\}\}/g, prenom)
@@ -372,31 +357,128 @@ app.post('/api/send', requireAuth, async (req, res) => {
       const fetchRes = await fetch(template.attachment_url);
       if (fetchRes.ok) {
         const buf = Buffer.from(await fetchRes.arrayBuffer());
-        attachmentFile = {
-          buffer: buf,
-          mimetype: fetchRes.headers.get('content-type') || 'application/octet-stream',
-          originalname: template.attachment_name || 'document'
-        };
+        attachmentFile = { buffer: buf, mimetype: fetchRes.headers.get('content-type') || 'application/octet-stream', originalname: template.attachment_name || 'document' };
       }
     } catch (err) { console.error('Attachment fetch error:', err.message); }
   }
 
-  const raw = createRawEmail(senderHeader, email, subject, htmlBody, attachmentFile);
+  const raw = createRawEmail(senderHeader, recipientEmail, subject, htmlBody, attachmentFile);
+  const result = await gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
+  const threadId = result.data.threadId || null;
+
+  await supabase.from('email_logs').insert({
+    user_id: userId,
+    user_email: userEmail,
+    template_id: template.id,
+    template_name: template.name,
+    recipient_email: recipientEmail,
+    gmail_thread_id: threadId
+  });
+
+  return { threadId };
+}
+
+app.post('/api/send', requireAuth, async (req, res) => {
+  const { templateId, prenom, email, date_rdv } = req.body;
+  if (!templateId || !prenom || !email) return res.status(400).json({ error: 'templateId, prenom et email sont requis.' });
+
+  const templates = await getTemplates();
+  const template = templates.find(t => t.id === templateId);
+  if (!template) return res.status(404).json({ error: 'Template introuvable.' });
+
+  if ((template.body?.includes('{{date_rdv}}') || template.subject?.includes('{{date_rdv}}')) && !date_rdv) {
+    return res.status(400).json({ error: 'La date du RDV est requise pour ce template.' });
+  }
+
+  const gmail = await getGmailClient(req.user.id);
+  if (!gmail) return res.status(400).json({ error: 'Gmail non configuré. Va dans Configuration.' });
+
+  const config = await getUserConfig(req.user.id);
   try {
-    await gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
-    // Log l'envoi pour les stats
-    await supabase.from('email_logs').insert({
-      user_id: req.user.id,
-      user_email: req.user.email,
-      template_id: template.id,
-      template_name: template.name,
-      recipient_email: email
-    });
+    await sendEmail({ userId: req.user.id, userEmail: req.user.email, template, gmail, config, recipientEmail: email, prenom, date_rdv });
     res.json({ success: true, message: `Email envoyé à ${email}` });
   } catch (err) {
     console.error('Erreur envoi Gmail:', err.message);
     res.status(500).json({ error: `Échec de l'envoi: ${err.message}` });
   }
+});
+
+// ============ SCAN NO-RÉPONSE ============
+
+app.get('/api/scan-no-reply', requireAuth, async (req, res) => {
+  const { templateId } = req.query;
+  if (!templateId) return res.status(400).json({ error: 'templateId requis.' });
+
+  const gmail = await getGmailClient(req.user.id);
+  if (!gmail) return res.status(400).json({ error: 'Gmail non configuré.' });
+
+  const config = await getUserConfig(req.user.id);
+  const senderEmail = config.gmailUser || '';
+
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  const { data: logs, error } = await supabase
+    .from('email_logs')
+    .select('*')
+    .eq('user_id', req.user.id)
+    .eq('template_id', templateId)
+    .gte('sent_at', sevenDaysAgo)
+    .not('gmail_thread_id', 'is', null);
+
+  if (error) return res.status(500).json({ error: error.message });
+  if (!logs.length) return res.json([]);
+
+  const noReply = [];
+  for (const log of logs) {
+    try {
+      const thread = await gmail.users.threads.get({ userId: 'me', id: log.gmail_thread_id, format: 'metadata', metadataHeaders: ['From'] });
+      const messages = thread.data.messages || [];
+      const hasReply = messages.some(m => {
+        const from = m.payload.headers.find(h => h.name === 'From')?.value || '';
+        return !from.includes(senderEmail);
+      });
+      if (!hasReply) {
+        noReply.push({
+          log_id: log.id,
+          recipient_email: log.recipient_email,
+          template_name: log.template_name,
+          sent_at: log.sent_at,
+          gmail_thread_id: log.gmail_thread_id
+        });
+      }
+    } catch (err) {
+      console.error(`Thread ${log.gmail_thread_id} error:`, err.message);
+    }
+  }
+
+  res.json(noReply);
+});
+
+app.post('/api/send-bulk', requireAuth, async (req, res) => {
+  const { templateId, recipients } = req.body;
+  // recipients: [{email, prenom, date_rdv?}]
+  if (!templateId || !recipients?.length) return res.status(400).json({ error: 'templateId et recipients requis.' });
+
+  const templates = await getTemplates();
+  const template = templates.find(t => t.id === templateId);
+  if (!template) return res.status(404).json({ error: 'Template introuvable.' });
+
+  const gmail = await getGmailClient(req.user.id);
+  if (!gmail) return res.status(400).json({ error: 'Gmail non configuré.' });
+
+  const config = await getUserConfig(req.user.id);
+  const results = [];
+
+  for (const r of recipients) {
+    try {
+      await sendEmail({ userId: req.user.id, userEmail: req.user.email, template, gmail, config, recipientEmail: r.email, prenom: r.prenom || r.email.split('@')[0], date_rdv: r.date_rdv });
+      results.push({ email: r.email, success: true });
+    } catch (err) {
+      results.push({ email: r.email, success: false, error: err.message });
+    }
+  }
+
+  const sent = results.filter(r => r.success).length;
+  res.json({ results, sent, total: recipients.length });
 });
 
 function createRawEmail(from, to, subject, htmlBody, file) {
