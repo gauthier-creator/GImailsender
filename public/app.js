@@ -74,7 +74,8 @@ document.getElementById('scanBtn').addEventListener('click', async () => {
   scanResultsDiv.style.display = 'none';
 
   try {
-    const res = await fetch(`/api/scan-no-reply?templateId=${templateId}`, { headers: authHeaders(session) });
+    const days = parseInt(document.getElementById('scanDays').value) || 7;
+    const res = await fetch(`/api/scan-no-reply?templateId=${templateId}&days=${days}`, { headers: authHeaders(session) });
     const data = await res.json();
 
     if (!res.ok) { scanStatus.textContent = 'Erreur : ' + data.error; btn.disabled = false; btn.textContent = '🔍 Lancer le scan'; return; }

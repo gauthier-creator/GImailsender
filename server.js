@@ -415,7 +415,8 @@ app.get('/api/scan-no-reply', requireAuth, async (req, res) => {
   const config = await getUserConfig(req.user.id);
   const senderEmail = config.gmailUser || '';
 
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  const days = Math.min(Math.max(parseInt(req.query.days) || 7, 1), 90);
+  const sevenDaysAgo = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString();
   const { data: logs, error } = await supabase
     .from('email_logs')
     .select('*')

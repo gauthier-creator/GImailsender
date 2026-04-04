@@ -79,9 +79,14 @@
         </div>
       </div>
 
-      <button id="scanBtn" type="button" style="background:#1a1a1a;border:1px solid #333;color:#e0e0e0;width:auto;padding:10px 24px;font-size:13px;border-radius:8px;cursor:pointer;margin-bottom:16px;">
-        🔍 Lancer le scan
-      </button>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+        <button id="scanBtn" type="button" style="background:#1a1a1a;border:1px solid #333;color:#e0e0e0;width:auto;padding:10px 24px;font-size:13px;border-radius:8px;cursor:pointer;">
+          🔍 Lancer le scan
+        </button>
+        <span style="font-size:13px;color:#555;">sur les</span>
+        <input type="number" id="scanDays" value="7" min="1" max="90" style="width:60px;text-align:center;padding:8px;font-size:13px;">
+        <span style="font-size:13px;color:#555;">derniers jours</span>
+      </div>
 
       <div id="scanStatus" style="display:none;font-size:13px;color:#666;margin-bottom:12px;"></div>
 
