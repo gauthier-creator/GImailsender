@@ -218,7 +218,7 @@ app.get('/api/config/oauth/start', requireAuth, async (req, res) => {
   const oauth2Client = new google.auth.OAuth2(config.gmailClientId, config.gmailClientSecret, redirectUri);
   const authUrl = oauth2Client.generateAuthUrl({
     access_type: 'offline',
-    scope: ['https://www.googleapis.com/auth/gmail.send', 'https://www.googleapis.com/auth/gmail.settings.basic'],
+    scope: ['https://www.googleapis.com/auth/gmail.send', 'https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.settings.basic'],
     prompt: 'consent',
     state: req.user.id   // pass userId through OAuth state
   });
@@ -425,20 +425,47 @@ app.get('/api/scan-no-reply', requireAuth, async (req, res) => {
     .select('*')
     .eq('user_id', req.user.id)
     .eq('template_id', templateId)
-    .gte('sent_at', since)
-    .not('gmail_thread_id', 'is', null);
+    .gte('sent_at', since);
 
   if (error) return res.status(500).json({ error: error.message });
   if (!logs.length) return res.json([]);
 
+  // Pour les logs sans thread_id, on cherche le thread via Gmail search
+  for (const log of logs) {
+    if (!log.gmail_thread_id) {
+      try {
+        const afterTs = Math.floor(new Date(log.sent_at).getTime() / 1000) - 60;
+        const q = `to:${log.recipient_email} after:${afterTs} in:sent`;
+        const search = await gmail.users.messages.list({ userId: 'me', q, maxResults: 1 });
+        const msgId = search.data.messages?.[0]?.id;
+        if (msgId) {
+          const msg = await gmail.users.messages.get({ userId: 'me', id: msgId, format: 'minimal' });
+          log.gmail_thread_id = msg.data.threadId || null;
+          // Sauvegarder le thread_id en base pour les prochains scans
+          if (log.gmail_thread_id) {
+            await supabase.from('email_logs').update({ gmail_thread_id: log.gmail_thread_id }).eq('id', log.id);
+          }
+        }
+      } catch (err) {
+        console.error(`Thread lookup for ${log.recipient_email}:`, err.message);
+      }
+    }
+  }
+
   const noReply = [];
   for (const log of logs) {
+    if (!log.gmail_thread_id) {
+      // Pas de thread trouvé → on considère sans réponse
+      noReply.push({ log_id: log.id, recipient_email: log.recipient_email, template_name: log.template_name, sent_at: log.sent_at, gmail_thread_id: null });
+      continue;
+    }
     try {
       const thread = await gmail.users.threads.get({ userId: 'me', id: log.gmail_thread_id, format: 'metadata', metadataHeaders: ['From'] });
       const messages = thread.data.messages || [];
-      const hasReply = messages.some(m => {
+      // Un seul message = pas de réponse. Sinon on vérifie si quelqu'un d'autre a répondu
+      const hasReply = messages.length > 1 && messages.some(m => {
         const from = m.payload.headers.find(h => h.name === 'From')?.value || '';
-        return !from.includes(senderEmail);
+        return senderEmail ? !from.includes(senderEmail) : false;
       });
       if (!hasReply) {
         noReply.push({
@@ -451,6 +478,8 @@ app.get('/api/scan-no-reply', requireAuth, async (req, res) => {
       }
     } catch (err) {
       console.error(`Thread ${log.gmail_thread_id} error:`, err.message);
+      // En cas d'erreur API, on inclut quand même dans les sans-réponse
+      noReply.push({ log_id: log.id, recipient_email: log.recipient_email, template_name: log.template_name, sent_at: log.sent_at, gmail_thread_id: log.gmail_thread_id });
     }
   }
 
